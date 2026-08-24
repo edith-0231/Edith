@@ -12,7 +12,7 @@ const isTouchDevice = window.matchMedia('(hover:none), (pointer:coarse)').matche
 // ---- Phase content library ----
 const PHASE_META = {
   menstrual: {
-    label: 'Menstrual Phase', world: 'The Crimson Sanctuary', mantra: 'Rest • Recover • Restore',
+    label: 'Menstrual Phase', world: 'Menstrual Phase', mantra: 'Rest and recover',
     order: 0, colors: { c1: '#2E0A14', c2: '#160409', glow: '#FF3B5C', text: '#F6E7EA' },
     nextLabel: 'Follicular Phase',
     insight: 'Energy tends to sit at its lowest here — many people notice they need more rest in these first few days.',
@@ -21,16 +21,16 @@ const PHASE_META = {
     need: ['Pads, tampons or a cup', 'A heating pad', 'Extra water', 'Comfortable, loose clothing', 'A spare pair of underwear on hand'],
   },
   follicular: {
-    label: 'Follicular Phase', world: 'The Bloom', mantra: 'Grow • Energize • Inspire',
+    label: 'Follicular Phase', world: 'Follicular Phase', mantra: 'Build momentum',
     order: 1, colors: { c1: '#122A1A', c2: '#070F0B', glow: '#A8E6B0', text: '#EAF4EC' },
-    nextLabel: 'Ovulation',
+    nextLabel: 'Ovulation Phase',
     insight: 'Energy typically climbs from here as hormones rise — a good window for new starts and harder training.',
     do: ['Start new projects while motivation is rising', 'Add strength training back in', 'Try new foods or routines', 'Make plans — social energy is climbing', 'Get sunlight where possible'],
     avoid: ['Overloading the calendar before energy actually peaks', 'Skipping protein at meals', 'Assuming a low-energy day is the new normal'],
     need: ['Light layers for changing energy', 'A journal or planner', 'Regular workout gear', 'Balanced, protein-forward meals'],
   },
   ovulation: {
-    label: 'Ovulation', world: 'The Golden Peak', mantra: 'Radiate • Connect • Shine',
+    label: 'Ovulation Phase', world: 'Ovulation Phase', mantra: 'Peak energy',
     order: 2, colors: { c1: '#2E1D08', c2: '#140D04', glow: '#FFCB5C', text: '#FBF1DE' },
     nextLabel: 'Luteal Phase',
     insight: 'This is usually the highest-energy point of the cycle for most people — a natural peak for effort and connection.',
@@ -39,7 +39,7 @@ const PHASE_META = {
     need: ['Ovulation test strips, if you are tracking fertility', 'Contraception, if relevant to you', 'A water bottle you will actually refill'],
   },
   luteal: {
-    label: 'Luteal Phase', world: 'The Twilight', mantra: 'Slow Down • Reflect • Prepare',
+    label: 'Luteal Phase', world: 'Luteal Phase', mantra: 'Slow and prepare',
     order: 3, colors: { c1: '#14122E', c2: '#08070F', glow: '#8C6FE0', text: '#ECE8FA' },
     nextLabel: 'Next Period',
     insight: 'Energy commonly dips through this phase, especially in the final days — PMS symptoms are hormonal, not a character flaw.',
@@ -87,17 +87,46 @@ const LEARN_CONTENT = [
   },
 ];
 
+// Add local images to the images folder and put their relative paths here.
+// Example: './images/menstrual.jpg'
+const LOCAL_PHASE_IMAGES = {
+  menstrual: './period self care ❤️.jpg',
+  follicular: './download.jpg',
+  ovulation: './cuteness overload here 💅🔥.jpg',
+  luteal: './download (1).jpg',
+};
+
+const PHASE_IMAGES = {
+  menstrual: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=900&q=80',
+  follicular: 'https://images.unsplash.com/photo-1490750967868-88aa4486c946?auto=format&fit=crop&w=900&q=80',
+  ovulation: 'https://unsplash.com/photos/9sXLmVxj2z0/download?force=true&w=900',
+  luteal: 'https://unsplash.com/photos/GaxgmVGCHzc/download?force=true&w=900',
+};
+
+const PHASE_IMAGE_FALLBACKS = {
+  ovulation: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=900&q=80',
+  luteal: 'https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=900&q=80',
+};
+
+const PHASE_IMAGE_ALTS = {
+  menstrual: 'Rich red abstract texture',
+  follicular: 'Fresh flowers in bloom',
+  ovulation: 'Bold fashion portrait with a romantic mood',
+  luteal: 'Woman resting quietly on a bed',
+};
+
 // ---- Storage ----
 function loadData() {
   try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : null; }
   catch (e) { return null; }
 }
 function saveData(data) { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+function getPhaseImage(data, key) { return LOCAL_PHASE_IMAGES[key] || data?.customImages?.[key] || PHASE_IMAGES[key]; }
 function todayKey() { return dateOnlyString(new Date()); }
 function isFutureDate(value) { return value > todayKey(); }
 function getTodayLog(data) {
   if (!data.logs) data.logs = {};
-  if (!data.logs[todayKey()]) data.logs[todayKey()] = { mood: null, symptoms: [], sleep: 7 };
+  if (!data.logs[todayKey()]) data.logs[todayKey()] = { mood: null, symptoms: [] };
   return data.logs[todayKey()];
 }
 
@@ -217,14 +246,23 @@ function buildWorldGallery() {
   PHASE_ORDER.forEach((key) => {
     const meta = PHASE_META[key];
     const card = document.createElement('button');
-    card.className = 'world-card';
+    card.className = `world-card world-card--${key}`;
     card.style.setProperty('--wc-1', meta.colors.c1);
     card.style.setProperty('--wc-2', meta.colors.c2);
     card.style.setProperty('--wc-glow', meta.colors.glow);
     card.style.setProperty('--wc-text', meta.colors.text);
-    card.innerHTML = `<span class="world-tag">Phase ${meta.order + 1} of 4</span>
+    card.innerHTML = `<img class="world-image" src="${getPhaseImage(loadData(), key)}" alt="${PHASE_IMAGE_ALTS[key]}" loading="lazy" decoding="async">
+      <span class="world-tag">Phase ${meta.order + 1} of 4</span>
       <span class="world-name">${meta.world}</span>
       <span class="world-mantra">${meta.mantra}</span>`;
+    card.querySelector('.world-image').addEventListener('error', (event) => {
+      const fallback = PHASE_IMAGE_FALLBACKS[key];
+      if (fallback && event.currentTarget.src !== fallback) {
+        event.currentTarget.src = fallback;
+      } else {
+        event.currentTarget.hidden = true;
+      }
+    });
     card.addEventListener('click', () => {
       setBodyPhase(key);
       setTimeout(() => setBodyPhase('void'), 3200);
@@ -242,6 +280,22 @@ function showOnboarding() {
   if (countdownTimer) clearInterval(countdownTimer);
 }
 
+function goToHomePage() {
+  showOnboarding();
+  window.scrollTo({ top: 0, behavior: 'auto' });
+}
+
+function getStoredPeriodEnd(data) {
+  if (data.lastPeriodEnd) return data.lastPeriodEnd;
+  const endDate = parseDateOnly(data.lastPeriodStart);
+  endDate.setDate(endDate.getDate() + data.periodLength - 1);
+  return dateOnlyString(endDate);
+}
+
+function isValidPeriodEnd(startDate, endDate) {
+  return Boolean(endDate) && endDate >= startDate && !isFutureDate(endDate);
+}
+
 // ---------------- TRACKER ----------------
 function showTracker() {
   const saved = loadData();
@@ -256,6 +310,8 @@ function showTracker() {
   $('appNav').hidden = false;
   if (window.matchMedia('(max-width:640px)').matches) $('bottomNav').hidden = false;
   $('editLastPeriod').max = todayKey();
+  $('editLastPeriodEnd').max = todayKey();
+  $('lastPeriodEndDate').max = todayKey();
   renderAll();
   if (countdownTimer) clearInterval(countdownTimer);
   countdownTimer = setInterval(tick, 1000);
@@ -404,8 +460,28 @@ function renderHistory(data) {
 
 function renderSettingsForm(data) {
   $('editLastPeriod').value = data.lastPeriodStart;
+  $('editLastPeriodEnd').value = getStoredPeriodEnd(data);
   $('editCycleLength').value = data.cycleLength;
   $('editPeriodLength').value = data.periodLength;
+}
+
+function setupPhaseImageUploads() {
+  document.querySelectorAll('[data-phase-image]').forEach((input) => {
+    input.addEventListener('change', () => {
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.addEventListener('load', () => {
+        const data = loadData();
+        if (!data) return;
+        if (!data.customImages) data.customImages = {};
+        data.customImages[input.dataset.phaseImage] = reader.result;
+        saveData(data);
+        buildWorldGallery();
+      });
+      reader.readAsDataURL(file);
+    });
+  });
 }
 
 function buildLearnAccordion() {
@@ -526,9 +602,20 @@ if (isFinePointer && !prefersReducedMotion) {
 document.addEventListener('DOMContentLoaded', () => {
   buildWorldGallery();
   buildLearnAccordion();
+  setupPhaseImageUploads();
+  document.querySelectorAll('[data-fallback]').forEach((image) => {
+    image.addEventListener('error', () => { image.hidden = true; });
+  });
 
   const existing = loadData();
   if (existing) showTracker(); else showOnboarding();
+
+  $('landingNavBtn').addEventListener('click', goToHomePage);
+  $('mobileHomeBtn').addEventListener('click', goToHomePage);
+  $('brandHomeLink').addEventListener('click', (event) => {
+    event.preventDefault();
+    goToHomePage();
+  });
 
   $('startTrackingBtn').addEventListener('click', () => {
     document.getElementById('setupSection').scrollIntoView({ behavior: 'smooth' });
@@ -537,16 +624,31 @@ document.addEventListener('DOMContentLoaded', () => {
   $('setupForm').addEventListener('submit', (e) => {
     e.preventDefault();
     const lastPeriodStart = $('lastPeriodDate').value;
+    const lastPeriodEnd = $('lastPeriodEndDate').value;
     const cycleLength = parseInt($('cycleLength').value, 10);
     const periodLength = parseInt($('periodLength').value, 10);
     $('dateError').hidden = true;
+    $('endDateError').hidden = true;
     if (!lastPeriodStart) return;
     if (isFutureDate(lastPeriodStart)) {
       $('dateError').hidden = false;
       $('lastPeriodDate').focus();
       return;
     }
-    saveData({ lastPeriodStart, cycleLength, periodLength, history: [lastPeriodStart], logs: {} });
+    if (!isValidPeriodEnd(lastPeriodStart, lastPeriodEnd)) {
+      $('endDateError').hidden = false;
+      $('lastPeriodEndDate').focus();
+      return;
+    }
+    const calculatedPeriodLength = Math.round((parseDateOnly(lastPeriodEnd) - parseDateOnly(lastPeriodStart)) / DAY_MS) + 1;
+    if (calculatedPeriodLength > 10) {
+      $('endDateError').textContent = 'The period length cannot be longer than 10 days.';
+      $('endDateError').hidden = false;
+      $('lastPeriodEndDate').focus();
+      return;
+    }
+    $('periodLength').value = calculatedPeriodLength;
+    saveData({ lastPeriodStart, lastPeriodEnd, cycleLength, periodLength: calculatedPeriodLength, history: [lastPeriodStart], logs: {} });
     showTracker();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
@@ -555,14 +657,28 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     const data = loadData() || {};
     data.lastPeriodStart = $('editLastPeriod').value;
+    data.lastPeriodEnd = $('editLastPeriodEnd').value;
     if (!data.lastPeriodStart || isFutureDate(data.lastPeriodStart)) {
       $('editLastPeriod').setCustomValidity('Choose today or an earlier date.');
       $('editLastPeriod').reportValidity();
       return;
     }
+    if (!isValidPeriodEnd(data.lastPeriodStart, data.lastPeriodEnd)) {
+      $('editLastPeriodEnd').setCustomValidity('Choose an end date on or after the start date and no later than today.');
+      $('editLastPeriodEnd').reportValidity();
+      return;
+    }
+    const calculatedPeriodLength = Math.round((parseDateOnly(data.lastPeriodEnd) - parseDateOnly(data.lastPeriodStart)) / DAY_MS) + 1;
+    if (calculatedPeriodLength > 10) {
+      $('editLastPeriodEnd').setCustomValidity('The period length cannot be longer than 10 days.');
+      $('editLastPeriodEnd').reportValidity();
+      return;
+    }
     $('editLastPeriod').setCustomValidity('');
+    $('editLastPeriodEnd').setCustomValidity('');
     data.cycleLength = parseInt($('editCycleLength').value, 10);
-    data.periodLength = parseInt($('editPeriodLength').value, 10);
+    data.periodLength = calculatedPeriodLength;
+    $('editPeriodLength').value = calculatedPeriodLength;
     if (!data.history) data.history = [data.lastPeriodStart];
     saveData(data);
     renderAll();
@@ -583,6 +699,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!data.history) data.history = [];
     if (!data.history.includes(todayStr)) data.history.unshift(todayStr);
     data.lastPeriodStart = todayStr;
+    data.lastPeriodEnd = todayStr;
+    data.periodLength = 1;
     saveData(data);
     renderAll();
   }
@@ -597,7 +715,10 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   $('partnerName').addEventListener('input', () => {
-    if (currentData) renderCouples(computeCycleInfo(currentData), PHASE_META[effectivePhase(computeCycleInfo(currentData))]);
+    if (currentData) {
+      const info = computeCycleInfo(currentData);
+      renderCouples(info, PHASE_META[info.phase]);
+    }
   });
   $('copyCouplesBtn').addEventListener('click', async () => {
     const text = `${$('couplesTitle').textContent}. ${$('couplesSummary').textContent} ${$('couplesTry').textContent}`;
@@ -605,10 +726,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const button = $('copyCouplesBtn'); const original = button.textContent; button.textContent = 'Copied'; setTimeout(() => { button.textContent = original; }, 1500);
   });
 
-  $('sleepSlider').addEventListener('input', (e) => {
-    $('sleepValue').textContent = `${e.target.value} hours`;
-    const log = getTodayLog(currentData); log.sleep = parseFloat(e.target.value); saveData(currentData);
-  });
   // nav + bottom nav scroll
   document.querySelectorAll('[data-scroll]').forEach((btn) => {
     btn.addEventListener('click', () => {
