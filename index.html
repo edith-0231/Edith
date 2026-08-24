@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Edith — Understand Your Cycle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,500&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-phase="void">
+
+<canvas id="particleField" aria-hidden="true"></canvas>
+<div class="cursor-glow" id="cursorGlow" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
+
+<!-- ============ NAV ============ -->
+<header class="nav">
+  <div class="nav-inner">
+    <a href="#top" class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-word">EDITH</span>
+    </a>
+    <nav class="nav-links" id="appNav" hidden>
+      <button class="nav-link" data-scroll="ringSection">Cycle</button>
+      <button class="nav-link" data-scroll="dashSection">Insights</button>
+      <button class="nav-link" data-scroll="couplesSection">Couples</button>
+      <button class="nav-link" data-scroll="learnSection">Learn</button>
+      <button class="nav-link" data-scroll="calendarSection">Calendar</button>
+      <button class="nav-link" data-scroll="profileSection">Profile</button>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- ============================================================ -->
+  <!-- ONBOARDING VIEW                                               -->
+  <!-- ============================================================ -->
+  <section id="onboardingView">
+
+    <section class="hero">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <p class="eyebrow">A living visualization of your cycle</p>
+          <h1 class="hero-title">Understand<br><em>Your Cycle.</em></h1>
+          <h2 class="hero-title hero-title--sub">Empower Your Life.</h2>
+          <p class="hero-sub">Track, understand, and anticipate your cycle through an intelligent experience designed around your body's rhythm — not a spreadsheet pretending to care.</p>
+          <div class="hero-actions">
+            <button class="btn btn-primary" id="startTrackingBtn">Start Tracking</button>
+            <button class="btn btn-ghost" data-scroll="worldGallery">Explore Your Cycle</button>
+          </div>
+          <p class="trust-line">Your data belongs to you. Stored only on this device.</p>
+        </div>
+
+        <div class="ring-stage" id="onboardRingStage">
+          <svg class="ring-ghost" viewBox="0 0 320 320" aria-hidden="true">
+            <circle cx="160" cy="160" r="128" class="ring-ghost-track"/>
+            <circle cx="160" cy="160" r="98" class="ring-ghost-track ring-ghost-track--inner"/>
+          </svg>
+          <div class="ring-orbit" aria-hidden="true">
+            <span class="orbit-dot" style="--i:0"></span>
+            <span class="orbit-dot" style="--i:1"></span>
+            <span class="orbit-dot" style="--i:2"></span>
+            <span class="orbit-dot" style="--i:3"></span>
+            <span class="orbit-dot" style="--i:4"></span>
+            <span class="orbit-dot" style="--i:5"></span>
+          </div>
+          <div class="ring-glass">
+            <span class="ring-glass-label">Your cycle, waiting</span>
+            <span class="ring-glass-sub">Start tracking to bring it to life</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== WORLD GALLERY (explore phases before tracking) ===== -->
+    <section class="world-gallery" id="worldGallery">
+      <p class="eyebrow eyebrow--center">Four phases. Four worlds.</p>
+      <h2 class="section-title section-title--center">Every phase has its own universe</h2>
+      <div class="world-grid" id="worldGrid"><!-- injected by JS --></div>
+    </section>
+
+    <!-- ===== SETUP FORM ===== -->
+    <section class="setup" id="setupSection">
+      <div class="setup-card glass-panel tilt-card">
+        <p class="eyebrow">Begin</p>
+        <h2 class="section-title">When did your last period start?</h2>
+        <form id="setupForm">
+          <div class="field">
+            <label for="lastPeriodDate">First day of last period</label>
+            <input type="date" id="lastPeriodDate" required>
+            <p class="field-error" id="dateError" role="alert" hidden>Please choose today or an earlier date. A period start cannot be in the future.</p>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="cycleLength">Average cycle length <span>(days)</span></label>
+              <input type="number" id="cycleLength" min="18" max="45" value="28" required>
+            </div>
+            <div class="field">
+              <label for="periodLength">Period length <span>(days)</span></label>
+              <input type="number" id="periodLength" min="1" max="10" value="5" required>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Enter your cycle</button>
+          <p class="setup-note">Predictions are estimates based on averages — not a medical diagnosis.</p>
+        </form>
+      </div>
+    </section>
+
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- TRACKER VIEW                                                  -->
+  <!-- ============================================================ -->
+  <section id="trackerView" hidden>
+
+    <!-- ===== PREVIEW BANNER ===== -->
+    <div class="preview-banner" id="previewBanner" hidden>
+      <span>Previewing <strong id="previewPhaseName">—</strong></span>
+      <button class="btn btn-ghost btn-sm" id="exitPreviewBtn">Return to Today</button>
+    </div>
+
+    <!-- ===== HERO RING + LIVE COUNTDOWN ===== -->
+    <section class="ring-section" id="ringSection">
+      <div class="ring-section-grid">
+        <div class="ring-stage" id="trackerRingStage">
+          <svg class="cycle-ring" id="cycleRingSvg" viewBox="0 0 320 320"></svg>
+          <div class="ring-orbit" id="ringOrbit" aria-hidden="true">
+            <span class="orbit-dot" style="--i:0"></span>
+            <span class="orbit-dot" style="--i:1"></span>
+            <span class="orbit-dot" style="--i:2"></span>
+            <span class="orbit-dot" style="--i:3"></span>
+            <span class="orbit-dot" style="--i:4"></span>
+            <span class="orbit-dot" style="--i:5"></span>
+          </div>
+          <div class="ring-glass ring-glass--live">
+            <span class="ring-day" id="ringDay">Day 1</span>
+            <span class="ring-phase" id="ringPhase">Menstrual Phase</span>
+            <span class="ring-mantra" id="ringMantra">Rest • Recover • Restore</span>
+          </div>
+        </div>
+
+        <div class="countdown-panel">
+          <p class="eyebrow" id="countdownEyebrow">Estimated time to Follicular Phase</p>
+          <div class="countdown-display" id="phaseCountdown">
+            <div class="digit-group"><span class="digit" data-unit="d">00</span><span class="digit-label">Days</span></div>
+            <span class="digit-colon">:</span>
+            <div class="digit-group"><span class="digit" data-unit="h">00</span><span class="digit-label">Hours</span></div>
+            <span class="digit-colon">:</span>
+            <div class="digit-group"><span class="digit" data-unit="m">00</span><span class="digit-label">Minutes</span></div>
+            <span class="digit-colon">:</span>
+            <div class="digit-group"><span class="digit" data-unit="s">00</span><span class="digit-label">Seconds</span></div>
+          </div>
+
+          <div class="progress-row">
+            <div class="progress-ring-wrap">
+              <svg viewBox="0 0 80 80" class="progress-ring">
+                <circle cx="40" cy="40" r="34" class="progress-ring-track"/>
+                <circle cx="40" cy="40" r="34" class="progress-ring-fill" id="progressRingFill"/>
+              </svg>
+              <span class="progress-ring-value" id="progressRingValue">0%</span>
+            </div>
+            <div class="progress-copy">
+              <span class="progress-label">Cycle progress</span>
+              <span class="progress-sub" id="progressSub">Day 1 of 28</span>
+            </div>
+          </div>
+
+          <p class="secondary-countdown">Next period estimated <strong id="nextPeriodInline">—</strong></p>
+        </div>
+      </div>
+
+      <div class="warning-banner" id="lutealWarning" hidden>
+        <span class="warning-icon" aria-hidden="true">◐</span>
+        <div>
+          <strong id="warningHeadline">Your period is estimated soon.</strong>
+          <p id="warningBody">Time to restock supplies and slow down where you can.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== TIMELINE / PHASE SWITCHER ===== -->
+    <section class="timeline-section">
+      <p class="eyebrow eyebrow--center">The full rhythm</p>
+      <h2 class="section-title section-title--center">Your cycle timeline</h2>
+      <div class="timeline" id="timeline"><!-- injected --></div>
+    </section>
+
+    <!-- ===== DASHBOARD MODULES ===== -->
+    <section class="dash-section" id="dashSection">
+      <p class="eyebrow eyebrow--center">Today</p>
+      <h2 class="section-title section-title--center">Your dashboard</h2>
+
+      <div class="module-grid">
+        <article class="module glass-panel tilt-card module-energy">
+          <h3>Today's Energy</h3>
+          <div class="energy-bar-wrap"><div class="energy-bar" id="energyBar"></div></div>
+          <span class="energy-value" id="energyValue">—%</span>
+          <p class="module-note">Estimated from where you are in this phase.</p>
+        </article>
+
+        <article class="module glass-panel tilt-card module-mood">
+          <h3>Mood</h3>
+          <div class="chip-row" id="moodChips"></div>
+        </article>
+
+        <article class="module glass-panel tilt-card module-symptoms">
+          <h3>Symptoms</h3>
+          <div class="chip-row" id="symptomChips"></div>
+        </article>
+
+        <article class="module glass-panel tilt-card module-sleep">
+          <h3>Sleep</h3>
+          <input type="range" min="0" max="12" step="0.5" value="7" id="sleepSlider">
+          <span class="sleep-value" id="sleepValue">7 hours</span>
+        </article>
+
+        <article class="module glass-panel tilt-card module-progress">
+          <h3>Cycle Progress</h3>
+          <p class="module-big" id="dashProgress">—%</p>
+          <p class="module-note" id="dashProgressNote">Complete through this cycle</p>
+        </article>
+
+        <article class="module glass-panel tilt-card module-insight">
+          <h3>Insight</h3>
+          <p class="module-note module-insight-text" id="aiInsight">—</p>
+          <p class="insight-disclaimer">An estimate based on typical patterns — not a diagnosis.</p>
+        </article>
+      </div>
+
+      <div class="brief-card glass-panel">
+        <h3>Today, in one line</h3>
+        <p id="briefText">—</p>
+        <button class="btn btn-secondary btn-sm" id="copyBriefBtn">Copy summary</button>
+      </div>
+    </section>
+
+    <section class="couples-section" id="couplesSection">
+      <div class="couples-heading">
+        <div><p class="eyebrow">For couples</p><h2 class="section-title">Care works better<br>when it is <em>understood.</em></h2></div>
+        <p class="couples-lead">A simple, respectful briefing for the person beside you. Share what helps without sharing anything you want to keep private.</p>
+      </div>
+      <div class="couples-layout">
+        <div class="couples-brief glass-panel">
+          <div class="couples-brief-top"><span class="couples-orb">✦</span><span id="couplesPhaseLabel">Today’s phase</span></div>
+          <h3 id="couplesTitle">Your partner’s cycle, gently explained</h3>
+          <p id="couplesSummary">Add your date to create a phase-aware support note.</p>
+          <div class="couples-share-row"><input id="partnerName" type="text" maxlength="32" placeholder="Partner name (optional)" aria-label="Partner name, optional"><button class="btn btn-primary btn-sm" id="copyCouplesBtn" type="button">Copy briefing</button></div>
+        </div>
+        <div class="support-grid">
+          <article class="support-card glass-panel"><span class="support-icon">♥</span><h3>Try this</h3><p id="couplesTry">Ask what kind of support would feel good today.</p></article>
+          <article class="support-card glass-panel"><span class="support-icon">⌁</span><h3>Remember</h3><p id="couplesRemember">A phase is context, never a diagnosis or an excuse to assume how someone feels.</p></article>
+          <article class="support-card glass-panel"><span class="support-icon">◇</span><h3>Respect</h3><p id="couplesRespect">Ask before helping, respect a no, and keep private details private.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== PHASE DETAILS ===== -->
+    <section class="phase-details">
+      <div class="detail-card glass-panel tilt-card detail-do">
+        <h3>Do</h3>
+        <ul id="listDo"></ul>
+      </div>
+      <div class="detail-card glass-panel tilt-card detail-avoid">
+        <h3>Avoid</h3>
+        <ul id="listAvoid"></ul>
+      </div>
+      <div class="detail-card glass-panel tilt-card detail-need">
+        <h3>You'll want</h3>
+        <ul id="listNeed"></ul>
+      </div>
+    </section>
+
+    <!-- ===== LEARN ===== -->
+    <section class="learn-section" id="learnSection">
+      <p class="eyebrow eyebrow--center">The essentials</p>
+      <h2 class="section-title section-title--center">A little cycle literacy</h2>
+      <div class="accordion" id="learnAccordion"><!-- injected --></div>
+    </section>
+
+    <!-- ===== CALENDAR / HISTORY ===== -->
+    <section class="calendar-section" id="calendarSection">
+      <div class="calendar-head">
+        <div>
+          <p class="eyebrow">Logged so far</p>
+          <h2 class="section-title">Period calendar</h2>
+        </div>
+        <button class="btn btn-secondary" id="logTodayBtn">Log period started today</button>
+      </div>
+      <div class="table-wrap glass-panel">
+        <table class="history-table" id="historyTable">
+          <thead><tr><th>Started</th><th>Cycle length</th></tr></thead>
+          <tbody id="historyBody"></tbody>
+        </table>
+        <p class="history-empty" id="historyEmpty" hidden>Nothing logged yet — this fills in as cycles pass.</p>
+      </div>
+    </section>
+
+    <!-- ===== PROFILE / SETTINGS ===== -->
+    <section class="profile-section" id="profileSection">
+      <p class="eyebrow">Adjust</p>
+      <h2 class="section-title">Profile &amp; settings</h2>
+      <form id="settingsForm" class="settings-form glass-panel">
+        <div class="field">
+          <label for="editLastPeriod">Last period start date</label>
+          <input type="date" id="editLastPeriod" required>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="editCycleLength">Cycle length <span>(days)</span></label>
+            <input type="number" id="editCycleLength" min="18" max="45" required>
+          </div>
+          <div class="field">
+            <label for="editPeriodLength">Period length <span>(days)</span></label>
+            <input type="number" id="editPeriodLength" min="1" max="10" required>
+          </div>
+        </div>
+        <div class="settings-actions">
+          <button type="submit" class="btn btn-primary">Save changes</button>
+          <button type="button" class="btn btn-ghost" id="resetBtn">Erase all data</button>
+        </div>
+      </form>
+      <p class="trust-line trust-line--block">Private by design. Encrypted in your browser's local storage, never sent anywhere.</p>
+    </section>
+
+  </section>
+
+</main>
+
+<!-- ===== MOBILE BOTTOM NAV ===== -->
+<nav class="bottom-nav" id="bottomNav" hidden>
+  <button class="bottom-nav-item" data-scroll="ringSection">
+    <span class="bn-icon" aria-hidden="true">○</span><span>Home</span>
+  </button>
+  <button class="bottom-nav-item" data-scroll="dashSection">
+    <span class="bn-icon" aria-hidden="true">✦</span><span>Insights</span>
+  </button>
+  <button class="bottom-nav-item" data-scroll="calendarSection">
+    <span class="bn-icon" aria-hidden="true">▤</span><span>Calendar</span>
+  </button>
+  <button class="bottom-nav-item" data-scroll="profileSection">
+    <span class="bn-icon" aria-hidden="true">◍</span><span>Profile</span>
+  </button>
+</nav>
+
+<footer class="footer">
+  <p>Edith — a living visualization of your cycle. Not a medical device; estimates only.</p>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>
