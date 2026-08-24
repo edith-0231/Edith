@@ -87,32 +87,33 @@ const LEARN_CONTENT = [
   },
 ];
 
-// Add local images to the images folder and put their relative paths here.
-// Example: './images/menstrual.jpg'
+// Phase artwork shared across the Home Page and phase cards.
 const LOCAL_PHASE_IMAGES = {
-  menstrual: './period self care ❤️.jpg',
-  follicular: './download.jpg',
-  ovulation: './cuteness overload here 💅🔥.jpg',
-  luteal: './download (1).jpg',
+  menstrual: 'https://raw.githubusercontent.com/edith-0231/Edith/main/period%20self%20care%20%E2%9D%A4%EF%B8%8F.jpg',
+  follicular: 'https://raw.githubusercontent.com/edith-0231/Edith/main/download.jpg',
+  ovulation: 'https://raw.githubusercontent.com/edith-0231/Edith/main/cuteness%20overload%20here%20%F0%9F%92%85%F0%9F%94%A5.jpg',
+  luteal: 'https://raw.githubusercontent.com/edith-0231/Edith/main/download%20(1).jpg',
 };
 
 const PHASE_IMAGES = {
-  menstrual: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=900&q=80',
-  follicular: 'https://images.unsplash.com/photo-1490750967868-88aa4486c946?auto=format&fit=crop&w=900&q=80',
-  ovulation: 'https://unsplash.com/photos/9sXLmVxj2z0/download?force=true&w=900',
-  luteal: 'https://unsplash.com/photos/GaxgmVGCHzc/download?force=true&w=900',
+  menstrual: 'https://raw.githubusercontent.com/edith-0231/Edith/main/period%20self%20care%20%E2%9D%A4%EF%B8%8F.jpg',
+  follicular: 'https://raw.githubusercontent.com/edith-0231/Edith/main/download.jpg',
+  ovulation: 'https://raw.githubusercontent.com/edith-0231/Edith/main/cuteness%20overload%20here%20%F0%9F%92%85%F0%9F%94%A5.jpg',
+  luteal: 'https://raw.githubusercontent.com/edith-0231/Edith/main/download%20(1).jpg',
 };
 
 const PHASE_IMAGE_FALLBACKS = {
-  ovulation: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=900&q=80',
-  luteal: 'https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=900&q=80',
+  menstrual: 'https://raw.githubusercontent.com/edith-0231/Edith/main/period%20self%20care%20%E2%9D%A4%EF%B8%8F.jpg',
+  follicular: 'https://raw.githubusercontent.com/edith-0231/Edith/main/download.jpg',
+  ovulation: 'https://raw.githubusercontent.com/edith-0231/Edith/main/cuteness%20overload%20here%20%F0%9F%92%85%F0%9F%94%A5.jpg',
+  luteal: 'https://raw.githubusercontent.com/edith-0231/Edith/main/download%20(1).jpg',
 };
 
 const PHASE_IMAGE_ALTS = {
-  menstrual: 'Rich red abstract texture',
-  follicular: 'Fresh flowers in bloom',
-  ovulation: 'Bold fashion portrait with a romantic mood',
-  luteal: 'Woman resting quietly on a bed',
+  menstrual: 'Menstrual Phase',
+  follicular: 'Follicular Phase',
+  ovulation: 'Ovulation Phase',
+  luteal: 'Luteal Phase',
 };
 
 // ---- Storage ----
@@ -251,7 +252,7 @@ function buildWorldGallery() {
     card.style.setProperty('--wc-2', meta.colors.c2);
     card.style.setProperty('--wc-glow', meta.colors.glow);
     card.style.setProperty('--wc-text', meta.colors.text);
-    card.innerHTML = `<img class="world-image" src="${getPhaseImage(loadData(), key)}" alt="${PHASE_IMAGE_ALTS[key]}" loading="lazy" decoding="async">
+    card.innerHTML = `<img class="phase-image world-image" src="${getPhaseImage(loadData(), key)}" alt="${PHASE_IMAGE_ALTS[key]}" loading="lazy" decoding="async">
       <span class="world-tag">Phase ${meta.order + 1} of 4</span>
       <span class="world-name">${meta.world}</span>
       <span class="world-mantra">${meta.mantra}</span>`;
