@@ -22,11 +22,12 @@
       <span class="brand-word">EDITH</span>
     </a>
     <nav class="nav-links" id="appNav" hidden>
-      <button class="nav-link" data-scroll="ringSection">Cycle</button>
+      <button class="nav-link" data-scroll="ringSection">Home</button>
+      <button class="nav-link" data-scroll="timelineSection">Tracker</button>
       <button class="nav-link" data-scroll="dashSection">Insights</button>
-      <button class="nav-link" data-scroll="couplesSection">Couples</button>
-      <button class="nav-link" data-scroll="learnSection">Learn</button>
       <button class="nav-link" data-scroll="calendarSection">Calendar</button>
+      <button class="nav-link" data-scroll="learnSection">Learn</button>
+      <button class="nav-link" data-scroll="couplesSection">Community</button>
       <button class="nav-link" data-scroll="profileSection">Profile</button>
     </nav>
   </div>
@@ -115,12 +116,6 @@
   <!-- ============================================================ -->
   <section id="trackerView" hidden>
 
-    <!-- ===== PREVIEW BANNER ===== -->
-    <div class="preview-banner" id="previewBanner" hidden>
-      <span>Previewing <strong id="previewPhaseName">—</strong></span>
-      <button class="btn btn-ghost btn-sm" id="exitPreviewBtn">Return to Today</button>
-    </div>
-
     <!-- ===== HERO RING + LIVE COUNTDOWN ===== -->
     <section class="ring-section" id="ringSection">
       <div class="ring-section-grid">
@@ -153,20 +148,6 @@
             <div class="digit-group"><span class="digit" data-unit="s">00</span><span class="digit-label">Seconds</span></div>
           </div>
 
-          <div class="progress-row">
-            <div class="progress-ring-wrap">
-              <svg viewBox="0 0 80 80" class="progress-ring">
-                <circle cx="40" cy="40" r="34" class="progress-ring-track"/>
-                <circle cx="40" cy="40" r="34" class="progress-ring-fill" id="progressRingFill"/>
-              </svg>
-              <span class="progress-ring-value" id="progressRingValue">0%</span>
-            </div>
-            <div class="progress-copy">
-              <span class="progress-label">Cycle progress</span>
-              <span class="progress-sub" id="progressSub">Day 1 of 28</span>
-            </div>
-          </div>
-
           <p class="secondary-countdown">Next period estimated <strong id="nextPeriodInline">—</strong></p>
         </div>
       </div>
@@ -181,7 +162,7 @@
     </section>
 
     <!-- ===== TIMELINE / PHASE SWITCHER ===== -->
-    <section class="timeline-section">
+    <section class="timeline-section" id="timelineSection">
       <p class="eyebrow eyebrow--center">The full rhythm</p>
       <h2 class="section-title section-title--center">Your cycle timeline</h2>
       <div class="timeline" id="timeline"><!-- injected --></div>
@@ -193,13 +174,6 @@
       <h2 class="section-title section-title--center">Your dashboard</h2>
 
       <div class="module-grid">
-        <article class="module glass-panel tilt-card module-energy">
-          <h3>Today's Energy</h3>
-          <div class="energy-bar-wrap"><div class="energy-bar" id="energyBar"></div></div>
-          <span class="energy-value" id="energyValue">—%</span>
-          <p class="module-note">Estimated from where you are in this phase.</p>
-        </article>
-
         <article class="module glass-panel tilt-card module-mood">
           <h3>Mood</h3>
           <div class="chip-row" id="moodChips"></div>
@@ -214,12 +188,6 @@
           <h3>Sleep</h3>
           <input type="range" min="0" max="12" step="0.5" value="7" id="sleepSlider">
           <span class="sleep-value" id="sleepValue">7 hours</span>
-        </article>
-
-        <article class="module glass-panel tilt-card module-progress">
-          <h3>Cycle Progress</h3>
-          <p class="module-big" id="dashProgress">—%</p>
-          <p class="module-note" id="dashProgressNote">Complete through this cycle</p>
         </article>
 
         <article class="module glass-panel tilt-card module-insight">
