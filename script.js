@@ -466,25 +466,6 @@ function renderSettingsForm(data) {
   $('editPeriodLength').value = data.periodLength;
 }
 
-function setupPhaseImageUploads() {
-  document.querySelectorAll('[data-phase-image]').forEach((input) => {
-    input.addEventListener('change', () => {
-      const file = input.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.addEventListener('load', () => {
-        const data = loadData();
-        if (!data) return;
-        if (!data.customImages) data.customImages = {};
-        data.customImages[input.dataset.phaseImage] = reader.result;
-        saveData(data);
-        buildWorldGallery();
-      });
-      reader.readAsDataURL(file);
-    });
-  });
-}
-
 function buildLearnAccordion() {
   const wrap = $('learnAccordion');
   wrap.innerHTML = '';
@@ -603,7 +584,6 @@ if (isFinePointer && !prefersReducedMotion) {
 document.addEventListener('DOMContentLoaded', () => {
   buildWorldGallery();
   buildLearnAccordion();
-  setupPhaseImageUploads();
   document.querySelectorAll('[data-fallback]').forEach((image) => {
     image.addEventListener('error', () => { image.hidden = true; });
   });
