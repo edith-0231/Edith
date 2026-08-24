@@ -1,741 +1,524 @@
 /* ==========================================================
-   LIVE PERIOD — engine
+   LIVE PERIOD — design tokens
+   A living visualization: four phases, four visual worlds.
    ========================================================== */
 
-const STORAGE_KEY = 'liveperiod_data_v1';
-const DAY_MS = 24 * 60 * 60 * 1000;
-const PHASE_ORDER = ['menstrual', 'follicular', 'ovulation', 'luteal'];
-const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const isFinePointer = window.matchMedia('(hover:hover) and (pointer:fine)').matches;
-const isTouchDevice = window.matchMedia('(hover:none), (pointer:coarse)').matches || window.innerWidth <= 640;
+:root{
+  --font-display: 'Cormorant Garamond', serif;
+  --font-body: 'Manrope', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
 
-// ---- Phase content library ----
-const PHASE_META = {
-  menstrual: {
-    label: 'Menstrual Phase', world: 'Menstrual Phase', mantra: 'Rest and recover',
-    order: 0, colors: { c1: '#2E0A14', c2: '#160409', glow: '#FF3B5C', text: '#F6E7EA' },
-    nextLabel: 'Follicular Phase',
-    insight: 'Energy tends to sit at its lowest here — many people notice they need more rest in these first few days.',
-    do: ['Rest when you can, and let plans flex', 'Use warmth — a heating pad or warm bath for cramps', 'Move gently — a slow walk or restorative yoga', 'Eat iron-rich food (leafy greens, lentils, meat)', 'Track flow and pain'],
-    avoid: ['Pushing through intense workouts', 'Excess caffeine or alcohol', 'Tight or restrictive clothing', 'Ignoring pain that feels unusually severe'],
-    need: ['Pads, tampons or a cup', 'A heating pad', 'Extra water', 'Comfortable, loose clothing', 'A spare pair of underwear on hand'],
-  },
-  follicular: {
-    label: 'Follicular Phase', world: 'Follicular Phase', mantra: 'Build momentum',
-    order: 1, colors: { c1: '#122A1A', c2: '#070F0B', glow: '#A8E6B0', text: '#EAF4EC' },
-    nextLabel: 'Ovulation Phase',
-    insight: 'Energy typically climbs from here as hormones rise — a good window for new starts and harder training.',
-    do: ['Start new projects while motivation is rising', 'Add strength training back in', 'Try new foods or routines', 'Make plans — social energy is climbing', 'Get sunlight where possible'],
-    avoid: ['Overloading the calendar before energy actually peaks', 'Skipping protein at meals', 'Assuming a low-energy day is the new normal'],
-    need: ['Light layers for changing energy', 'A journal or planner', 'Regular workout gear', 'Balanced, protein-forward meals'],
-  },
-  ovulation: {
-    label: 'Ovulation Phase', world: 'Ovulation Phase', mantra: 'Peak energy',
-    order: 2, colors: { c1: '#2E1D08', c2: '#140D04', glow: '#FFCB5C', text: '#FBF1DE' },
-    nextLabel: 'Luteal Phase',
-    insight: 'This is usually the highest-energy point of the cycle for most people — a natural peak for effort and connection.',
-    do: ['Schedule the big, high-energy things here', 'High-intensity workouts, if that is your style', 'Notice fertile signs if you are tracking them', 'Stay well hydrated'],
-    avoid: ['Unprotected sex if you are avoiding pregnancy', 'Ignoring sharp one-sided pain (mittelschmerz is common but should stay mild)', 'Overbooking recovery-free days back to back'],
-    need: ['Ovulation test strips, if you are tracking fertility', 'Contraception, if relevant to you', 'A water bottle you will actually refill'],
-  },
-  luteal: {
-    label: 'Luteal Phase', world: 'Luteal Phase', mantra: 'Slow and prepare',
-    order: 3, colors: { c1: '#14122E', c2: '#08070F', glow: '#8C6FE0', text: '#ECE8FA' },
-    nextLabel: 'Next Period',
-    insight: 'Energy commonly dips through this phase, especially in the final days — PMS symptoms are hormonal, not a character flaw.',
-    do: ['Prioritise sleep as the week goes on', 'Eat magnesium-rich food (nuts, seeds, dark chocolate)', 'Keep exercise gentle and consistent', 'Prep period supplies before you need them', 'Be a little extra gentle with yourself'],
-    avoid: ['Heavy sugar or salt near the end of the phase', 'Overcommitting socially in the final days', 'Harsh self-talk about mood swings you can\u2019t fully control'],
-    need: ['A restocked period kit', 'Comfort items — heating pad, favourite tea', 'Comfortable, non-restrictive clothing', 'A mood note, if PMS tends to hit you hard'],
-  },
-};
+  --void: #07070A;
+  --paper: #F3EFE8;
+  --radius-sm: 10px;
+  --radius-md: 20px;
+  --radius-lg: 32px;
 
-const MOODS = ['Calm', 'Happy', 'Energized', 'Low', 'Irritable', 'Anxious'];
-const SYMPTOMS = ['Cramps', 'Headache', 'Bloating', 'Fatigue', 'Tender breasts', 'Acne'];
-
-const LEARN_CONTENT = [
-  {
-    title: 'Why the cycle happens at all',
-    body: `Every month, the uterus builds a soft, blood-rich lining in case of pregnancy. When pregnancy doesn't happen, hormone levels drop, that lining sheds, and it leaves the body as a period. It's not a malfunction — it's the same four-step process, on repeat, roughly every 21–35 days.`,
-  },
-  {
-    title: 'Sanitary pads',
-    body: `A padded strip that sticks inside your underwear and absorbs flow externally. Nothing is inserted, so there's no learning curve, and it's easy to check at a glance.
-    <br><br><strong>How to use one:</strong>
-    <ol><li>Peel off the paper backing strip</li><li>Press the sticky side onto clean, dry underwear</li><li>Fold side wings around the fabric edges if present</li><li>Change every 4–6 hours, sooner on heavy days</li><li>Wrap the used pad before binning it — never flush it</li></ol>`,
-  },
-  {
-    title: 'Tampons',
-    body: `A small absorbent core inserted into the vaginal canal, worn with a string left outside for removal. Invisible under any clothing, including swimwear.
-    <br><br><strong>How to use one:</strong>
-    <ol><li>Wash hands before opening</li><li>Insert at a slight backward angle using the applicator or your finger</li><li>Leave the string hanging outside</li><li>Change every 4–8 hours — never longer than 8</li><li>Choose the lowest absorbency that manages your flow</li></ol>`,
-  },
-  {
-    title: 'Menstrual cups',
-    body: `A soft silicone cup that sits low in the vaginal canal and collects, rather than absorbs, flow. One cup can last for years and holds more than a pad or tampon.
-    <br><br><strong>How to use one:</strong>
-    <ol><li>Fold the cup (C-fold or punch-down fold)</li><li>Insert and let it pop open to form a seal</li><li>Empty every 8–12 hours, rinse, and reinsert</li><li>Sterilise in boiling water between cycles</li></ol>`,
-  },
-  {
-    title: 'Period underwear',
-    body: `Underwear with built-in absorbent layers, worn alone or as backup with a cup or tampon. Feels like ordinary underwear and is reusable.
-    <br><br><strong>How to use it:</strong>
-    <ol><li>Wear like regular underwear, absorbent panel facing in</li><li>Rinse in cold water after use, then machine wash</li><li>Air dry — heat wears down the absorbent layers</li></ol>`,
-  },
-  {
-    title: 'Habits that matter regardless of what you use',
-    body: `<ul><li>Wash hands before and after changing any product</li><li>Change on schedule even on lighter days</li><li>Plain water is enough for external cleaning — scented washes can irritate</li><li>Keep a spare product and a change of underwear in your bag during period week</li></ul>`,
-  },
-];
-
-// Add local images to the images folder and put their relative paths here.
-// Example: './images/menstrual.jpg'
-const LOCAL_PHASE_IMAGES = {
-  menstrual: './period self care ❤️.jpg',
-  follicular: './download.jpg',
-  ovulation: './cuteness overload here 💅🔥.jpg',
-  luteal: './download (1).jpg',
-};
-
-const PHASE_IMAGES = {
-  menstrual: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=900&q=80',
-  follicular: 'https://images.unsplash.com/photo-1490750967868-88aa4486c946?auto=format&fit=crop&w=900&q=80',
-  ovulation: 'https://unsplash.com/photos/9sXLmVxj2z0/download?force=true&w=900',
-  luteal: 'https://unsplash.com/photos/GaxgmVGCHzc/download?force=true&w=900',
-};
-
-const PHASE_IMAGE_FALLBACKS = {
-  ovulation: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=900&q=80',
-  luteal: 'https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=900&q=80',
-};
-
-const PHASE_IMAGE_ALTS = {
-  menstrual: 'Rich red abstract texture',
-  follicular: 'Fresh flowers in bloom',
-  ovulation: 'Bold fashion portrait with a romantic mood',
-  luteal: 'Woman resting quietly on a bed',
-};
-
-// ---- Storage ----
-function loadData() {
-  try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : null; }
-  catch (e) { return null; }
-}
-function saveData(data) { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
-function getPhaseImage(data, key) { return LOCAL_PHASE_IMAGES[key] || data?.customImages?.[key] || PHASE_IMAGES[key]; }
-function todayKey() { return dateOnlyString(new Date()); }
-function isFutureDate(value) { return value > todayKey(); }
-function getTodayLog(data) {
-  if (!data.logs) data.logs = {};
-  if (!data.logs[todayKey()]) data.logs[todayKey()] = { mood: null, symptoms: [] };
-  return data.logs[todayKey()];
+  /* neutral shell defaults, overridden per phase below */
+  --p-primary:#8C1F3B;
+  --p-secondary:#5C1030;
+  --p-accent:#E85C7B;
+  --p-glow:#FF3B5C;
+  --p-bg-1:#0A0A0E;
+  --p-bg-2:#141018;
+  --p-text:#F3EFE8;
+  --p-muted: color-mix(in srgb, var(--p-text) 60%, transparent);
 }
 
-// ---- Date helpers ----
-function parseDateOnly(str) { const [y, m, d] = str.split('-').map(Number); return new Date(y, m - 1, d); }
-function dateOnlyString(date) {
-  const y = date.getFullYear(), m = String(date.getMonth() + 1).padStart(2, '0'), d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-function formatPretty(date) { return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }); }
-
-// ---- Cycle math ----
-function getPhaseBounds(cycleLength, periodLength) {
-  const ovulationDay = Math.max(periodLength + 3, cycleLength - 14);
-  const ovStart = Math.max(periodLength + 1, ovulationDay - 1);
-  const ovEnd = Math.min(cycleLength - 1, ovulationDay + 1);
-  return {
-    menstrual: { start: 1, end: periodLength },
-    follicular: { start: periodLength + 1, end: ovStart - 1 >= periodLength + 1 ? ovStart - 1 : periodLength + 1 },
-    ovulation: { start: ovStart, end: ovEnd },
-    luteal: { start: ovEnd + 1, end: cycleLength },
-  };
-}
-function getCurrentPhase(day, bounds) {
-  for (const key of PHASE_ORDER) { const b = bounds[key]; if (day >= b.start && day <= b.end) return key; }
-  return 'luteal';
-}
-function computeCycleInfo(data, now = new Date()) {
-  const { lastPeriodStart, cycleLength, periodLength } = data;
-  const startDate = parseDateOnly(lastPeriodStart);
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const daysSince = Math.floor((today - startDate) / DAY_MS);
-  const cyclesElapsed = Math.floor(daysSince / cycleLength);
-  const currentDay = (daysSince - cyclesElapsed * cycleLength) + 1;
-  const currentCycleStart = new Date(startDate.getTime() + cyclesElapsed * cycleLength * DAY_MS);
-  const bounds = getPhaseBounds(cycleLength, periodLength);
-  const phase = getCurrentPhase(currentDay, bounds);
-  const phaseEndDay = bounds[phase].end;
-  const nextPhaseKey = PHASE_ORDER[(PHASE_ORDER.indexOf(phase) + 1) % 4];
-  let nextPhaseDate = new Date(currentCycleStart.getTime() + phaseEndDay * DAY_MS);
-  if (phase === 'luteal') nextPhaseDate = new Date(currentCycleStart.getTime() + cycleLength * DAY_MS);
-  const nextPeriodDate = new Date(currentCycleStart.getTime() + cycleLength * DAY_MS);
-  const daysUntilNextPeriod = Math.ceil((nextPeriodDate - now) / DAY_MS);
-  const dayInPhase = currentDay - bounds[phase].start + 1;
-  const phaseLength = bounds[phase].end - bounds[phase].start + 1;
-  return { startDate, today, daysSince, cyclesElapsed, currentDay, currentCycleStart, bounds, phase,
-    nextPhaseKey, nextPhaseDate, nextPeriodDate, daysUntilNextPeriod, cycleLength, periodLength, dayInPhase, phaseLength };
+/* -------- Neutral "void" shell (onboarding, no data yet) -------- */
+body[data-phase="void"]{
+  --p-primary:#8C6FE0; --p-secondary:#4834A6; --p-accent:#D19FE8; --p-glow:#8C6FE0;
+  --p-bg-1:#07070C; --p-bg-2:#100E1C; --p-text:#F3EFE8;
 }
 
-// ==========================================================
-// RING RENDERING (SVG)
-// ==========================================================
-function renderRing(svgEl, bounds, cycleLength, currentDay, colors) {
-  const cx = 160, cy = 160, r = 130;
-  const C = 2 * Math.PI * r;
-  svgEl.innerHTML = '';
-  const ns = 'http://www.w3.org/2000/svg';
-
-  const track = document.createElementNS(ns, 'circle');
-  track.setAttribute('cx', cx); track.setAttribute('cy', cy); track.setAttribute('r', r);
-  track.setAttribute('class', 'wheel-track-base');
-  svgEl.appendChild(track);
-
-  let cumulativeDays = 0;
-  PHASE_ORDER.forEach((key) => {
-    const b = bounds[key];
-    const phaseDays = b.end - b.start + 1;
-    const arcLen = (phaseDays / cycleLength) * C;
-    const gap = C - arcLen;
-    const offset = -1 * (cumulativeDays / cycleLength) * C;
-    const seg = document.createElementNS(ns, 'circle');
-    seg.setAttribute('cx', cx); seg.setAttribute('cy', cy); seg.setAttribute('r', r);
-    seg.setAttribute('class', 'wheel-seg');
-    seg.setAttribute('stroke-dasharray', `${Math.max(arcLen - 4, 0)} ${gap + 4}`);
-    seg.setAttribute('stroke-dashoffset', offset);
-    seg.style.stroke = PHASE_META[key].colors.glow;
-    seg.style.opacity = key === bounds.__current ? '1' : '.55';
-    svgEl.appendChild(seg);
-    cumulativeDays += phaseDays;
-  });
-
-  const angle = ((currentDay - 0.5) / cycleLength) * 2 * Math.PI - Math.PI / 2;
-  const mx = cx + r * Math.cos(angle), my = cy + r * Math.sin(angle);
-  const marker = document.createElementNS(ns, 'circle');
-  marker.setAttribute('cx', mx); marker.setAttribute('cy', my); marker.setAttribute('r', 8);
-  marker.setAttribute('class', 'wheel-marker');
-  marker.style.fill = colors.glow;
-  svgEl.appendChild(marker);
+/* -------- MENSTRUAL — The Crimson Sanctuary -------- */
+body[data-phase="menstrual"]{
+  --p-primary:#C23A57; --p-secondary:#5C1030; --p-accent:#FF6B87; --p-glow:#FF3B5C;
+  --p-bg-1:#160409; --p-bg-2:#2E0A14; --p-text:#F6E7EA;
+}
+/* -------- FOLLICULAR — The Bloom -------- */
+body[data-phase="follicular"]{
+  --p-primary:#7FB88C; --p-secondary:#3E6B4A; --p-accent:#FFC98A; --p-glow:#A8E6B0;
+  --p-bg-1:#070F0B; --p-bg-2:#122A1A; --p-text:#EAF4EC;
+}
+/* -------- OVULATION — The Golden Peak -------- */
+body[data-phase="ovulation"]{
+  --p-primary:#F5B942; --p-secondary:#B5761A; --p-accent:#FFDE9E; --p-glow:#FFCB5C;
+  --p-bg-1:#140D04; --p-bg-2:#2E1D08; --p-text:#FBF1DE;
+}
+/* -------- LUTEAL — The Twilight -------- */
+body[data-phase="luteal"]{
+  --p-primary:#7C6AE8; --p-secondary:#3A2E80; --p-accent:#D19FE8; --p-glow:#8C6FE0;
+  --p-bg-1:#08070F; --p-bg-2:#14122E; --p-text:#ECE8FA;
 }
 
-function formatCountdownParts(ms) {
-  if (ms < 0) ms = 0;
-  const totalSec = Math.floor(ms / 1000);
-  return {
-    d: String(Math.floor(totalSec / 86400)).padStart(2, '0'),
-    h: String(Math.floor((totalSec % 86400) / 3600)).padStart(2, '0'),
-    m: String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0'),
-    s: String(totalSec % 60).padStart(2, '0'),
-  };
+*,*::before,*::after{ box-sizing:border-box; }
+html{ scroll-behavior:smooth; }
+body{
+  margin:0; min-height:100vh; overflow-x:hidden;
+  background:
+    radial-gradient(ellipse 90% 60% at 20% -10%, color-mix(in srgb, var(--p-primary) 30%, transparent), transparent 60%),
+    radial-gradient(ellipse 80% 60% at 90% 10%, color-mix(in srgb, var(--p-accent) 20%, transparent), transparent 60%),
+    linear-gradient(160deg, var(--p-bg-1), var(--p-bg-2) 60%, var(--void));
+  color:var(--p-text);
+  font-family:var(--font-body);
+  transition: background 1100ms ease, color 900ms ease;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3{ font-family:var(--font-display); font-weight:600; margin:0; }
+p{ margin:0; }
+ul,ol{ margin:0; padding-left:1.2em; }
+li{ margin-bottom:.4em; line-height:1.5; }
+a{ color:inherit; }
+button{ font-family:var(--font-body); cursor:pointer; }
+input{ font-family:var(--font-body); }
+
+#particleField{
+  position:fixed; inset:0; z-index:0; pointer-events:none; width:100%; height:100%;
+}
+.cursor-glow{
+  position:fixed; top:0; left:0; width:420px; height:420px; z-index:1; pointer-events:none;
+  border-radius:50%; opacity:0; transition:opacity .4s ease;
+  background:radial-gradient(circle, color-mix(in srgb, var(--p-glow) 22%, transparent), transparent 70%);
+  transform:translate(-50%,-50%);
+  will-change:transform;
+}
+.grain{
+  position:fixed; inset:0; pointer-events:none; z-index:2; opacity:.03; mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+main, .footer, .nav{ position:relative; z-index:3; }
+
+/* ---------------- typography helpers ---------------- */
+.eyebrow{
+  font-family:var(--font-mono); font-size:.7rem; letter-spacing:.18em; text-transform:uppercase;
+  color:var(--p-accent); margin-bottom:.7em; display:block;
+}
+.eyebrow--center{ text-align:center; }
+.section-title{ font-size:clamp(1.6rem,3.4vw,2.4rem); line-height:1.15; margin-bottom:.6em; font-style:italic; }
+.section-title--center{ text-align:center; }
+
+/* ---------------- NAV ---------------- */
+.nav{
+  position:sticky; top:0; z-index:30;
+  background:color-mix(in srgb, var(--p-bg-1) 55%, transparent);
+  backdrop-filter:blur(16px) saturate(140%);
+  border-bottom:1px solid color-mix(in srgb, var(--p-text) 12%, transparent);
+  transition:background 900ms ease, border-color 900ms ease;
+}
+.nav-inner{ max-width:1280px; margin:0 auto; padding:16px clamp(16px,4vw,44px); display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.brand{ display:flex; align-items:center; gap:10px; text-decoration:none; }
+.brand-mark{
+  width:14px; height:14px; border-radius:50%;
+  background: conic-gradient(from 0deg, var(--p-primary), var(--p-accent), var(--p-glow), var(--p-primary));
+  box-shadow:0 0 14px 2px color-mix(in srgb, var(--p-glow) 60%, transparent);
+}
+.brand-word{ font-family:var(--font-mono); font-size:.85rem; letter-spacing:.22em; font-weight:600; }
+.nav-links{ display:flex; gap:2px; }
+.nav-link{
+  background:none; border:none; color:var(--p-text); font-size:.82rem; font-weight:600;
+  padding:8px 13px; border-radius:999px; opacity:.65; transition:opacity .2s, background .2s;
+}
+.nav-link:hover, .nav-link:focus-visible{ opacity:1; background:color-mix(in srgb, var(--p-text) 10%, transparent); }
+
+/* ---------------- BUTTONS ---------------- */
+.btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  padding:15px 28px; border-radius:999px; border:1px solid transparent;
+  font-weight:700; font-size:.92rem; letter-spacing:.01em; text-decoration:none;
+  transition:transform .18s ease, filter .18s ease, box-shadow .18s ease, background .3s ease;
+}
+.btn:active{ transform:scale(.96); }
+.btn-primary{
+  background:linear-gradient(135deg, var(--p-primary), var(--p-accent));
+  color:var(--void); box-shadow:0 8px 26px -8px color-mix(in srgb, var(--p-glow) 70%, transparent);
+}
+.btn-primary:hover{ filter:brightness(1.08); transform:translateY(-1px); }
+.btn-secondary{ background:color-mix(in srgb, var(--p-text) 8%, transparent); color:var(--p-text); border:1px solid color-mix(in srgb, var(--p-text) 18%, transparent); }
+.btn-secondary:hover{ border-color:var(--p-accent); }
+.btn-ghost{ background:transparent; color:var(--p-text); border:1px solid color-mix(in srgb, var(--p-text) 22%, transparent); opacity:.85; }
+.btn-ghost:hover{ opacity:1; background:color-mix(in srgb, var(--p-text) 8%, transparent); }
+.btn-sm{ padding:9px 16px; font-size:.78rem; }
+.btn-block{ width:100%; }
+
+/* ---------------- GLASS PANEL ---------------- */
+.glass-panel{
+  background:linear-gradient(160deg, color-mix(in srgb, var(--p-text) 8%, transparent), color-mix(in srgb, var(--p-text) 3%, transparent));
+  border:1px solid color-mix(in srgb, var(--p-text) 14%, transparent);
+  backdrop-filter:blur(18px) saturate(140%);
+  border-radius:var(--radius-md);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 12%, transparent), 0 20px 50px -24px rgba(0,0,0,.6);
+}
+.tilt-card{ transform-style:preserve-3d; transition:transform .25s ease, box-shadow .25s ease; will-change:transform; }
+.tilt-card:hover{ box-shadow:0 26px 60px -20px color-mix(in srgb, var(--p-glow) 35%, transparent); }
+
+/* ---------------- HERO ---------------- */
+.hero{ max-width:1280px; margin:0 auto; padding:clamp(50px,8vw,110px) clamp(16px,4vw,44px) clamp(30px,6vw,60px); }
+.hero-grid{ display:grid; grid-template-columns:1.05fr .95fr; gap:clamp(30px,6vw,70px); align-items:center; }
+.hero-title{ font-size:clamp(2.6rem,6vw,4.6rem); line-height:1.02; margin:.15em 0 0; }
+.hero-title--sub{ font-size:clamp(2.6rem,6vw,4.6rem); font-style:italic; color:var(--p-accent); margin-bottom:.35em; }
+.hero-title em{ font-style:italic; color:var(--p-accent); }
+.hero-sub{ font-size:1.08rem; line-height:1.65; max-width:46ch; opacity:.82; margin-bottom:1.8em; }
+.hero-actions{ display:flex; gap:14px; flex-wrap:wrap; margin-bottom:1.4em; }
+.trust-line{ font-family:var(--font-mono); font-size:.72rem; letter-spacing:.05em; opacity:.55; }
+.trust-line--block{ text-align:center; margin-top:22px; }
+
+/* ---------------- RING STAGE (3D cycle visualization) ---------------- */
+.ring-stage{
+  position:relative; width:min(400px,86vw); height:min(400px,86vw); margin:0 auto;
+  perspective:1000px;
+}
+.hero-image{ position:absolute; inset:12%; width:76%; height:76%; object-fit:cover; border-radius:50%; opacity:.34; mix-blend-mode:screen; filter:saturate(1.25); }
+.ring-ghost, .cycle-ring{
+  width:100%; height:100%; transform-style:preserve-3d;
+  filter:drop-shadow(0 0 24px color-mix(in srgb, var(--p-glow) 35%, transparent));
+  animation: ring-breathe 7s ease-in-out infinite;
+}
+@keyframes ring-breathe{
+  0%,100%{ transform:rotateX(6deg) rotateY(0deg) scale(1); }
+  50%{ transform:rotateX(6deg) rotateY(4deg) scale(1.015); }
+}
+.ring-ghost-track{ fill:none; stroke:color-mix(in srgb, var(--p-text) 16%, transparent); stroke-width:8; stroke-dasharray:4 10; stroke-linecap:round; }
+.ring-ghost-track--inner{ stroke:color-mix(in srgb, var(--p-text) 10%, transparent); stroke-dasharray:2 8; }
+
+.ring-orbit{ position:absolute; inset:0; animation:orbit-spin 32s linear infinite; }
+@keyframes orbit-spin{ from{ transform:rotate(0deg); } to{ transform:rotate(360deg); } }
+.orbit-dot{
+  position:absolute; top:50%; left:50%; width:6px; height:6px; border-radius:50%;
+  background:var(--p-glow); box-shadow:0 0 10px 2px color-mix(in srgb, var(--p-glow) 80%, transparent);
+  transform:
+    rotate(calc(var(--i) * 60deg))
+    translateX(min(158px,42vw))
+    rotate(calc(var(--i) * -60deg));
+  opacity:.8;
 }
 
-// ==========================================================
-// APP STATE
-// ==========================================================
-let currentData = null;
-let countdownTimer = null;
-const $ = (id) => document.getElementById(id);
+.ring-glass{
+  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  width:62%; height:62%; border-radius:50%;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:6px;
+  background:radial-gradient(circle at 30% 25%, color-mix(in srgb, var(--p-text) 14%, transparent), color-mix(in srgb, var(--p-bg-1) 55%, transparent) 70%);
+  border:1px solid color-mix(in srgb, var(--p-text) 20%, transparent);
+  backdrop-filter:blur(10px);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 16%, transparent), 0 0 40px -6px color-mix(in srgb, var(--p-glow) 55%, transparent);
+  padding:16px;
+}
+.ring-glass-label{ font-family:var(--font-display); font-style:italic; font-size:1.2rem; }
+.ring-glass-sub{ font-family:var(--font-mono); font-size:.68rem; opacity:.6; letter-spacing:.04em; }
+.ring-day{ font-family:var(--font-mono); font-size:clamp(1.6rem,4vw,2.1rem); font-weight:700; letter-spacing:.02em; }
+.ring-phase{ font-family:var(--font-display); font-style:italic; font-size:clamp(1.15rem,2.6vw,1.5rem); color:var(--p-accent); }
+.ring-mantra{ font-family:var(--font-mono); font-size:.66rem; letter-spacing:.1em; text-transform:uppercase; opacity:.65; }
 
-function setBodyPhase(phaseKey) {
-  document.body.setAttribute('data-phase', phaseKey);
+.wheel-seg{ fill:none; stroke-width:9; stroke-linecap:round; transform:rotate(-90deg); transform-origin:160px 160px; }
+.wheel-track-base{ fill:none; stroke:color-mix(in srgb, var(--p-text) 10%, transparent); stroke-width:9; }
+.wheel-marker{ filter:drop-shadow(0 0 8px var(--p-glow)); }
+
+/* ---------------- WORLD GALLERY ---------------- */
+.world-gallery{ max-width:1280px; margin:0 auto; padding:clamp(50px,8vw,90px) clamp(16px,4vw,44px); }
+.world-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:18px; margin-top:34px; }
+.world-card{
+  position:relative; border-radius:var(--radius-md); padding:26px 22px; min-height:230px;
+  display:flex; flex-direction:column; justify-content:flex-end; gap:6px; overflow:hidden;
+  border:1px solid color-mix(in srgb, var(--wc-text, #fff) 18%, transparent);
+  cursor:pointer; text-align:left; color:var(--wc-text,#fff);
+  transition:transform .3s ease, box-shadow .3s ease;
+}
+.world-card::before{
+  content:''; position:absolute; inset:0; z-index:1;
+  background: radial-gradient(ellipse 120% 90% at 30% 110%, var(--wc-glow), transparent 65%),
+              linear-gradient(160deg, var(--wc-1), var(--wc-2));
+}
+.world-image{ position:absolute; inset:0; z-index:0; width:100%; height:100%; object-fit:cover; opacity:.62; mix-blend-mode:screen; }
+.world-card > *:not(.world-image){ position:relative; z-index:2; }
+.world-card:hover, .world-card:focus-visible{ transform:translateY(-6px); box-shadow:0 24px 50px -18px var(--wc-glow); }
+.world-tag{ font-family:var(--font-mono); font-size:.65rem; letter-spacing:.12em; text-transform:uppercase; opacity:.75; }
+.world-name{ font-family:var(--font-display); font-style:italic; font-size:1.5rem; }
+.world-mantra{ font-family:var(--font-mono); font-size:.7rem; opacity:.75; letter-spacing:.04em; }
+
+/* ---------------- SETUP FORM ---------------- */
+.setup{ max-width:1280px; margin:0 auto; padding:0 clamp(16px,4vw,44px) clamp(70px,9vw,110px); }
+.setup-card{ padding:clamp(26px,5vw,46px); max-width:640px; }
+.field{ margin-bottom:16px; display:flex; flex-direction:column; gap:7px; }
+.field label{ font-size:.85rem; font-weight:700; }
+.field label span{ font-weight:400; opacity:.55; }
+.field input[type="date"], .field input[type="number"]{
+  padding:13px 14px; border-radius:var(--radius-sm); border:1px solid color-mix(in srgb, var(--p-text) 20%, transparent);
+  background:color-mix(in srgb, var(--p-bg-1) 60%, transparent); color:var(--p-text); font-size:1rem;
+}
+.field input:focus-visible{ outline:2px solid var(--p-accent); outline-offset:1px; }
+.field-error{ color:#ff9aa8; font-size:.76rem; line-height:1.4; margin-top:2px; }
+.field input[type="range"]{ width:100%; accent-color:var(--p-accent); }
+.field-row{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.setup-note{ font-size:.75rem; opacity:.55; margin-top:10px; text-align:center; }
+
+/* ---------------- TRACKER: RING SECTION ---------------- */
+.ring-section{ max-width:1280px; margin:0 auto; padding:clamp(30px,6vw,60px) clamp(16px,4vw,44px) 10px; }
+.ring-section-grid{ display:grid; grid-template-columns:auto 1fr; gap:clamp(30px,6vw,64px); align-items:center; }
+
+.countdown-panel{ display:flex; flex-direction:column; gap:20px; }
+.countdown-display{ display:flex; align-items:baseline; gap:6px; flex-wrap:wrap; }
+.digit-group{ display:flex; flex-direction:column; align-items:center; gap:4px; }
+.digit{
+  font-family:var(--font-mono); font-size:clamp(2rem,5vw,3.1rem); font-weight:700; letter-spacing:.02em;
+  color:var(--p-text); text-shadow:0 0 22px color-mix(in srgb, var(--p-glow) 55%, transparent);
+  min-width:1.6ch; text-align:center; display:inline-block;
+  transition:opacity .18s ease, transform .18s ease;
+}
+.digit.is-rolling{ opacity:0; transform:translateY(-8px); }
+.digit-label{ font-family:var(--font-mono); font-size:.62rem; letter-spacing:.14em; text-transform:uppercase; opacity:.55; }
+.digit-colon{ font-family:var(--font-mono); font-size:2rem; opacity:.4; align-self:flex-start; margin-top:.1em; }
+
+.secondary-countdown{ font-size:.92rem; opacity:.8; }
+.secondary-countdown strong{ color:var(--p-accent); }
+
+.warning-banner{
+  margin-top:26px; display:flex; gap:14px; align-items:flex-start;
+  background:color-mix(in srgb, var(--p-primary) 22%, transparent);
+  border:1px solid var(--p-accent); border-left:5px solid var(--p-accent);
+  border-radius:var(--radius-md); padding:18px 20px; backdrop-filter:blur(12px);
+}
+.warning-icon{ font-size:1.4rem; color:var(--p-accent); line-height:1; }
+.warning-banner p{ font-size:.9rem; opacity:.85; margin-top:4px; }
+
+/* ---------------- TIMELINE ---------------- */
+.timeline-section{ max-width:1280px; margin:0 auto; padding:clamp(50px,8vw,90px) clamp(16px,4vw,44px); }
+.timeline{ display:flex; gap:14px; margin-top:30px; position:relative; }
+.timeline::before{
+  content:''; position:absolute; top:22px; left:0; right:0; height:1px;
+  background:color-mix(in srgb, var(--p-text) 18%, transparent);
+}
+.timeline-node{
+  position:relative; flex:1; display:flex; flex-direction:column; align-items:center; gap:10px;
+  background:none; border:none; color:var(--p-text); padding:0 6px 0; text-align:center;
+}
+.timeline-node .tn-dot{
+  width:14px; height:14px; border-radius:50%; background:color-mix(in srgb, var(--p-text) 30%, transparent);
+  border:2px solid color-mix(in srgb, var(--p-text) 40%, transparent); transition:all .3s ease;
+}
+.timeline-node.is-active .tn-dot{
+  background:var(--tn-glow); border-color:var(--tn-glow); box-shadow:0 0 16px 3px var(--tn-glow);
+}
+.timeline-node .tn-label{ font-family:var(--font-display); font-style:italic; font-size:1.05rem; margin-top:6px; }
+.timeline-node .tn-range{ font-family:var(--font-mono); font-size:.68rem; opacity:.55; }
+.timeline-node:hover .tn-dot{ transform:scale(1.2); }
+
+/* ---------------- DASHBOARD MODULES ---------------- */
+.dash-section{ max-width:1280px; margin:0 auto; padding:clamp(50px,8vw,90px) clamp(16px,4vw,44px); }
+.module-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-top:30px; }
+.module{ padding:24px; display:flex; flex-direction:column; gap:12px; }
+.module h3{ font-size:1rem; font-family:var(--font-mono); text-transform:uppercase; letter-spacing:.06em; font-weight:600; }
+.module-note{ font-size:.84rem; opacity:.7; line-height:1.5; }
+.chip-row{ display:flex; flex-wrap:wrap; gap:8px; }
+.chip{
+  padding:8px 14px; border-radius:999px; border:1px solid color-mix(in srgb, var(--p-text) 22%, transparent);
+  background:transparent; color:var(--p-text); font-size:.8rem; font-weight:600; transition:all .2s ease;
+}
+.chip:hover{ border-color:var(--p-accent); }
+.chip.is-active{ background:var(--p-accent); color:var(--void); border-color:var(--p-accent); }
+
+.brief-card{ margin-top:20px; padding:24px; display:flex; flex-direction:column; gap:14px; }
+.brief-card h3{ font-family:var(--font-mono); font-size:.9rem; text-transform:uppercase; letter-spacing:.06em; }
+.brief-card p{ font-size:.95rem; line-height:1.55; opacity:.9; }
+.insight-disclaimer{ font-size:.7rem; opacity:.5; }
+
+/* ---------------- COUPLES SUPPORT ---------------- */
+.couples-section{ max-width:1280px; margin:0 auto; padding:clamp(50px,8vw,90px) clamp(16px,4vw,44px); }
+.couples-heading{ display:flex; justify-content:space-between; align-items:end; gap:35px; margin-bottom:30px; }.couples-heading .section-title{ margin-bottom:0; }.couples-heading em{ color:var(--p-accent); }.couples-lead{ max-width:330px; font-size:.88rem; line-height:1.6; opacity:.72; }
+.couples-layout{ display:grid; grid-template-columns:.9fr 1.1fr; gap:18px; }.couples-brief{ padding:28px; display:flex; flex-direction:column; gap:14px; border-color:color-mix(in srgb,var(--p-accent) 35%,transparent); }.couples-brief-top{ display:flex; align-items:center; gap:10px; font: .68rem var(--font-mono); text-transform:uppercase; letter-spacing:.1em; color:var(--p-accent); }.couples-orb{ display:grid; place-items:center; width:28px; height:28px; border:1px solid var(--p-accent); border-radius:50%; }.couples-brief h3{ font-size:1.7rem; line-height:1.05; }.couples-brief>p{ font-size:.88rem; line-height:1.65; opacity:.78; }.couples-share-row{ display:flex; gap:9px; margin-top:auto; padding-top:10px; }.couples-share-row input{ min-width:0; flex:1; padding:10px 12px; border:1px solid color-mix(in srgb,var(--p-text) 20%,transparent); border-radius:999px; background:color-mix(in srgb,var(--p-bg-1) 50%,transparent); color:var(--p-text); }.support-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:18px; }.support-card{ padding:23px 20px; min-height:185px; }.support-icon{ color:var(--p-accent); font-size:1.2rem; }.support-card h3{ margin:22px 0 10px; font-size:1.15rem; }.support-card p{ font-size:.8rem; line-height:1.6; opacity:.72; }
+
+/* ---------------- PHASE DETAILS ---------------- */
+.phase-details{ max-width:1280px; margin:0 auto; padding:10px clamp(16px,4vw,44px) 30px; display:grid; grid-template-columns:repeat(3,1fr); gap:18px; }
+.detail-card{ padding:22px 24px; border-top:3px solid var(--p-accent); }
+.detail-card h3{ font-size:1rem; text-transform:uppercase; letter-spacing:.06em; margin-bottom:.7em; font-family:var(--font-mono); font-weight:600; }
+.detail-card li{ font-size:.9rem; }
+
+/* ---------------- LEARN / ACCORDION ---------------- */
+.learn-section{ max-width:1000px; margin:0 auto; padding:clamp(50px,8vw,90px) clamp(16px,4vw,44px); }
+.accordion{ display:flex; flex-direction:column; gap:12px; margin-top:30px; }
+.accordion-item{ border-radius:var(--radius-md); overflow:hidden; }
+.accordion-trigger{
+  width:100%; text-align:left; background:none; border:none; color:var(--p-text);
+  padding:20px 22px; display:flex; justify-content:space-between; align-items:center; gap:12px;
+  font-family:var(--font-display); font-style:italic; font-size:1.2rem;
+}
+.accordion-trigger .acc-plus{ font-family:var(--font-mono); font-size:1.2rem; transition:transform .3s ease; }
+.accordion-item.is-open .acc-plus{ transform:rotate(45deg); }
+.accordion-panel{ max-height:0; overflow:hidden; transition:max-height .4s ease; }
+.accordion-item.is-open .accordion-panel{ max-height:600px; }
+.accordion-panel-inner{ padding:0 22px 22px; font-size:.92rem; line-height:1.6; opacity:.88; }
+.accordion-panel-inner ul, .accordion-panel-inner ol{ margin-top:.6em; }
+
+/* ---------------- CALENDAR ---------------- */
+.calendar-section{ max-width:1280px; margin:0 auto; padding:clamp(50px,8vw,90px) clamp(16px,4vw,44px); }
+.calendar-head{ display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:16px; margin-bottom:20px; }
+.table-wrap{ overflow:hidden; }
+.history-table{ width:100%; border-collapse:collapse; }
+.history-table th, .history-table td{ text-align:left; padding:13px 20px; font-size:.9rem; border-bottom:1px solid color-mix(in srgb, var(--p-text) 12%, transparent); }
+.history-table th{ font-family:var(--font-mono); font-size:.7rem; text-transform:uppercase; letter-spacing:.06em; opacity:.6; }
+.history-table tr:last-child td{ border-bottom:none; }
+.history-empty{ padding:26px; font-size:.9rem; opacity:.6; text-align:center; }
+
+/* ---------------- PROFILE ---------------- */
+.profile-section{ max-width:1280px; margin:0 auto; padding:0 clamp(16px,4vw,44px) 110px; }
+.settings-form{ padding:clamp(22px,4vw,32px); max-width:640px; }
+.settings-actions{ display:flex; gap:12px; margin-top:8px; flex-wrap:wrap; }
+.phase-image-settings{ margin:22px 0 10px; padding-top:20px; border-top:1px solid color-mix(in srgb,var(--p-text) 12%,transparent); }
+.settings-label{ font-family:var(--font-mono); font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; }
+.settings-help{ margin-top:5px; font-size:.78rem; opacity:.62; }
+.image-upload-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:14px; }
+.image-upload-field{ display:flex; flex-direction:column; gap:8px; padding:12px; border:1px solid color-mix(in srgb,var(--p-text) 15%,transparent); border-radius:var(--radius-sm); font-size:.76rem; font-weight:700; }
+.image-upload-field input{ width:100%; min-width:0; font-size:.7rem; color:var(--p-text); }
+
+/* ---------------- BOTTOM NAV (mobile) ---------------- */
+.bottom-nav{
+  position:fixed; bottom:0; left:0; right:0; z-index:50; display:none;
+  padding:10px 14px calc(10px + env(safe-area-inset-bottom));
+  background:color-mix(in srgb, var(--p-bg-1) 82%, transparent); backdrop-filter:blur(18px);
+  border-top:1px solid color-mix(in srgb, var(--p-text) 14%, transparent);
+  justify-content:space-between; align-items:center;
+}
+.bottom-nav-item{
+  background:none; border:none; color:var(--p-text); opacity:.6;
+  display:flex; flex-direction:column; align-items:center; gap:3px; font-size:.62rem; font-weight:600;
+  padding:4px 8px;
+}
+.bottom-nav-item .bn-icon{ font-size:1.05rem; }
+
+/* ---------------- FOOTER ---------------- */
+.footer{ text-align:center; padding:34px 20px 60px; font-size:.76rem; opacity:.5; }
+
+/* ---------------- RESPONSIVE ---------------- */
+@media (max-width: 980px){
+  .hero-grid{ grid-template-columns:1fr; text-align:center; }
+  .hero-sub{ margin-left:auto; margin-right:auto; }
+  .hero-actions{ justify-content:center; }
+  .ring-stage{ order:-1; }
+  .world-grid{ grid-template-columns:repeat(2,1fr); }
+  .ring-section-grid{ grid-template-columns:1fr; text-align:center; justify-items:center; }
+  .countdown-display{ justify-content:center; }
+  .module-grid{ grid-template-columns:repeat(2,1fr); }
+  .couples-layout{ grid-template-columns:1fr; }
+  .phase-details{ grid-template-columns:1fr; }
+}
+@media (max-width: 640px){
+  html{ scroll-behavior:auto; }
+  body{ transition:none; }
+  .grain{ display:none; }
+  .glass-panel, .nav, .bottom-nav, .ring-glass, .warning-banner{ backdrop-filter:none; }
+  .ring-ghost, .cycle-ring, .ring-orbit{ animation:none; }
+  .tilt-card{ transform-style:flat; will-change:auto; }
+  .ring-ghost,.cycle-ring,.wheel-marker{ filter:none; }
+  .nav-links{ display:none; }
+  .world-grid{ grid-template-columns:1fr; }
+  .field-row{ grid-template-columns:1fr; }
+  .module-grid{ grid-template-columns:1fr; }
+  .couples-heading{ align-items:start; flex-direction:column; gap:15px; }.support-grid{ grid-template-columns:1fr; gap:12px; }.support-card{ min-height:0; }.couples-share-row{ flex-direction:column; }.couples-share-row .btn{ width:100%; }
+  .digit{ font-size:1.7rem; }
+  .digit-colon{ font-size:1.5rem; }
+  .bottom-nav{ display:flex; }
+  main{ padding-bottom:70px; }
+  .cursor-glow{ display:none; }
+}
+@media (min-width:641px){
+  .bottom-nav{ display:none !important; }
+}
+@media (max-width:380px){
+  .brand-word{ display:none; }
 }
 
-// ---------------- ONBOARDING ----------------
-function buildWorldGallery() {
-  const grid = $('worldGrid');
-  grid.innerHTML = '';
-  PHASE_ORDER.forEach((key) => {
-    const meta = PHASE_META[key];
-    const card = document.createElement('button');
-    card.className = `world-card world-card--${key}`;
-    card.style.setProperty('--wc-1', meta.colors.c1);
-    card.style.setProperty('--wc-2', meta.colors.c2);
-    card.style.setProperty('--wc-glow', meta.colors.glow);
-    card.style.setProperty('--wc-text', meta.colors.text);
-    card.innerHTML = `<img class="world-image" src="${getPhaseImage(loadData(), key)}" alt="${PHASE_IMAGE_ALTS[key]}" loading="lazy" decoding="async">
-      <span class="world-tag">Phase ${meta.order + 1} of 4</span>
-      <span class="world-name">${meta.world}</span>
-      <span class="world-mantra">${meta.mantra}</span>`;
-    card.querySelector('.world-image').addEventListener('error', (event) => {
-      const fallback = PHASE_IMAGE_FALLBACKS[key];
-      if (fallback && event.currentTarget.src !== fallback) {
-        event.currentTarget.src = fallback;
-      } else {
-        event.currentTarget.hidden = true;
-      }
-    });
-    card.addEventListener('click', () => {
-      setBodyPhase(key);
-      setTimeout(() => setBodyPhase('void'), 3200);
-    });
-    grid.appendChild(card);
-  });
+/* No fine pointer (touch) -> disable tilt & cursor glow */
+@media (hover:none), (pointer:coarse){
+  .cursor-glow{ display:none; }
 }
 
-function showOnboarding() {
-  $('onboardingView').hidden = false;
-  $('trackerView').hidden = true;
-  $('appNav').hidden = true;
-  $('bottomNav').hidden = true;
-  setBodyPhase('void');
-  if (countdownTimer) clearInterval(countdownTimer);
+@media (prefers-reduced-motion: reduce){
+  *{ animation:none !important; transition:none !important; scroll-behavior:auto !important; }
 }
 
-function goToHomePage() {
-  showOnboarding();
-  window.scrollTo({ top: 0, behavior: 'auto' });
+/* ---------------- REFERENCE VISUAL SYSTEM ---------------- */
+body{ background:
+  radial-gradient(circle at 50% 24%, color-mix(in srgb,var(--p-glow) 16%,transparent), transparent 28%),
+  radial-gradient(circle at 8% 82%, color-mix(in srgb,var(--p-primary) 18%,transparent), transparent 30%),
+  linear-gradient(135deg,var(--p-bg-1) 0%,#08080e 52%,var(--p-bg-2) 100%); }
+.nav{ background:rgba(7,7,12,.72); border-bottom-color:rgba(255,255,255,.1); }
+.nav-inner{ max-width:1440px; padding-top:13px; padding-bottom:13px; }
+.brand-mark{ width:15px; height:15px; box-shadow:0 0 18px 3px color-mix(in srgb,var(--p-glow) 70%,transparent); }
+.brand-word{ font-size:.72rem; letter-spacing:.19em; }
+.nav-links{ gap:4px; }
+.nav-link{ font-size:.68rem; padding:7px 12px; opacity:.7; }
+.hero{ max-width:1440px; min-height:650px; padding-top:56px; padding-bottom:42px; }
+.hero-grid{ grid-template-columns:minmax(280px,.7fr) minmax(440px,1.3fr); gap:12px; }
+.hero-copy{ position:relative; z-index:2; }
+.hero-title{ font-size:clamp(3.2rem,5vw,5.7rem); letter-spacing:-.015em; }
+.hero-title--sub{ font-size:clamp(2.7rem,4.2vw,4.8rem); }
+.hero-sub{ max-width:34ch; font-size:.82rem; line-height:1.65; opacity:.72; }
+.eyebrow{ font-size:.6rem; letter-spacing:.16em; }
+.btn{ padding:11px 20px; font-size:.72rem; }
+.btn-sm{ padding:8px 13px; font-size:.66rem; }
+.ring-stage{ width:min(590px,62vw); height:min(590px,62vw); }
+.ring-ghost,.cycle-ring{ filter:drop-shadow(0 0 32px color-mix(in srgb,var(--p-glow) 48%,transparent)); }
+.ring-glass{ width:56%; height:56%; background:radial-gradient(circle at 35% 25%,color-mix(in srgb,var(--p-text) 16%,transparent),color-mix(in srgb,var(--p-bg-1) 86%,transparent) 68%); }
+.ring-glass-label{ font-size:1.45rem; }
+.world-gallery,.dash-section,.couples-section,.learn-section,.calendar-section{ max-width:1440px; }
+.world-gallery{ padding-top:28px; }
+.world-grid{ gap:8px; margin-top:24px; }
+.world-card{ min-height:265px; border-radius:8px; padding:22px 20px; border-color:rgba(255,255,255,.2); box-shadow:inset 0 0 70px rgba(0,0,0,.18); }
+.world-card::before{ background:radial-gradient(circle at 72% 30%,var(--wc-glow),transparent 18%),radial-gradient(circle at 55% 44%,color-mix(in srgb,var(--wc-glow) 70%,transparent),transparent 7%),radial-gradient(ellipse 130% 100% at 20% 115%,var(--wc-glow),transparent 62%),linear-gradient(150deg,var(--wc-1),var(--wc-2)); }
+.world-card::after{ content:''; position:absolute; width:112px; height:112px; right:18%; top:19%; border-radius:50%; background:radial-gradient(circle at 32% 28%,rgba(255,255,255,.72),var(--wc-glow) 14%,color-mix(in srgb,var(--wc-glow) 45%,transparent) 48%,transparent 70%); box-shadow:0 0 36px var(--wc-glow); opacity:.65; }
+.world-card > *{ z-index:1; }
+.world-name{ font-size:1.75rem; }
+.world-mantra{ font-size:.62rem; }
+.setup-card,.glass-panel{ border-radius:10px; background:linear-gradient(145deg,rgba(255,255,255,.08),rgba(255,255,255,.025)); border-color:rgba(255,255,255,.13); }
+.dash-section{ padding-top:58px; }
+.module-grid{ gap:10px; margin-top:22px; }
+.module{ min-height:142px; padding:18px; border-radius:9px; }
+.module h3,.brief-card h3{ font-size:.72rem; }
+.chip{ font-size:.68rem; padding:7px 11px; }
+.brief-card{ border-radius:9px; padding:18px; }
+.timeline-section{ max-width:1440px; }
+.timeline-node .tn-label{ font-size:.9rem; }
+.couples-section,.learn-section,.calendar-section,.profile-section{ padding-top:58px; }
+
+@media (max-width:980px){
+  .hero{ min-height:0; }
+  .hero-grid{ grid-template-columns:1fr; }
+  .hero-copy{ order:2; }
+  .ring-stage{ width:min(520px,88vw); height:min(520px,88vw); }
+}
+@media (max-width:640px){
+  .nav-inner{ padding-left:16px; padding-right:16px; }
+  .hero{ padding-top:30px; }
+  .hero-title{ font-size:clamp(2.7rem,13vw,4rem); }
+  .hero-title--sub{ font-size:clamp(2.4rem,11vw,3.5rem); }
+  .hero-sub{ font-size:.76rem; }
+  .hero-actions{ gap:8px; }
+  .ring-stage{ width:92vw; height:92vw; }
+  .world-card{ min-height:210px; }
+  .world-card::after{ width:90px; height:90px; }
+  .module-grid{ gap:10px; }
+  .module{ min-height:0; }
+  .image-upload-grid{ grid-template-columns:1fr; }
 }
 
-function getStoredPeriodEnd(data) {
-  if (data.lastPeriodEnd) return data.lastPeriodEnd;
-  const endDate = parseDateOnly(data.lastPeriodStart);
-  endDate.setDate(endDate.getDate() + data.periodLength - 1);
-  return dateOnlyString(endDate);
+@media (max-width:640px){
+  .ring-ghost,.cycle-ring,.wheel-marker{ filter:none !important; }
 }
 
-function isValidPeriodEnd(startDate, endDate) {
-  return Boolean(endDate) && endDate >= startDate && !isFutureDate(endDate);
+/* Keep the uploaded phase photos natural instead of washing them with glow. */
+.world-card--follicular .world-image,
+.world-card--ovulation .world-image,
+.world-card--luteal .world-image{ mix-blend-mode:normal; opacity:.82; }
+.world-card--follicular::before,
+.world-card--ovulation::before,
+.world-card--luteal::before{ background:linear-gradient(160deg,var(--wc-1),var(--wc-2)); }
+.world-card--follicular::after,
+.world-card--ovulation::after,
+.world-card--luteal::after{ display:none; }
+
+/* Keep every image frame consistent and centered. */
+.world-card{ height:265px; min-height:0; }
+.world-image{ width:100%; height:100%; object-fit:cover; object-position:center center; }
+.hero-image{ object-position:center center; }
+@media (max-width:640px){
+  .world-card{ height:210px; }
 }
-
-// ---------------- TRACKER ----------------
-function showTracker() {
-  const saved = loadData();
-  if (saved && isFutureDate(saved.lastPeriodStart)) {
-    $('lastPeriodDate').value = saved.lastPeriodStart;
-    showOnboarding();
-    $('dateError').hidden = false;
-    return;
-  }
-  $('onboardingView').hidden = true;
-  $('trackerView').hidden = false;
-  $('appNav').hidden = false;
-  if (window.matchMedia('(max-width:640px)').matches) $('bottomNav').hidden = false;
-  $('editLastPeriod').max = todayKey();
-  $('editLastPeriodEnd').max = todayKey();
-  $('lastPeriodEndDate').max = todayKey();
-  renderAll();
-  if (countdownTimer) clearInterval(countdownTimer);
-  countdownTimer = setInterval(tick, 1000);
-}
-
-function renderAll() {
-  currentData = loadData();
-  if (!currentData) { showOnboarding(); return; }
-  const info = computeCycleInfo(currentData);
-  const meta = PHASE_META[info.phase];
-  setBodyPhase(info.phase);
-
-  const bounds = { ...info.bounds, __current: info.phase };
-  renderRing($('cycleRingSvg'), bounds, info.cycleLength, info.currentDay, meta.colors);
-  $('ringDay').textContent = `Day ${info.currentDay}`;
-  $('ringPhase').textContent = meta.label;
-  $('ringMantra').textContent = meta.mantra;
-
-  $('countdownEyebrow').textContent = `Estimated time to ${meta.nextLabel}`;
-  $('nextPeriodInline').textContent = formatPretty(info.nextPeriodDate);
-
-  fillList('listDo', meta.do);
-  fillList('listAvoid', meta.avoid);
-  fillList('listNeed', meta.need);
-
-  // luteal warning (based on real data only)
-  const warn = $('lutealWarning');
-  if (info.phase === 'luteal' && info.daysUntilNextPeriod <= 5) {
-    warn.hidden = false;
-    const d = info.daysUntilNextPeriod;
-    $('warningHeadline').textContent = d <= 0 ? 'Your period is estimated any time now.' : `Your period is estimated in ${d} day${d === 1 ? '' : 's'}.`;
-    $('warningBody').textContent = 'Restock supplies, keep a heating pad handy, and pack a small kit if you\u2019ll be out.';
-  } else { warn.hidden = true; }
-
-  renderTimeline(info);
-  renderDashboard(info, meta);
-  renderHistory(currentData);
-  renderSettingsForm(currentData);
-  renderMoodChips();
-  renderSymptomChips();
-
-  tick(); // set initial countdown numbers immediately
-}
-
-function fillList(id, items) {
-  const el = $(id); el.innerHTML = '';
-  items.forEach((t) => { const li = document.createElement('li'); li.textContent = t; el.appendChild(li); });
-}
-
-function renderTimeline(info) {
-  const wrap = $('timeline');
-  wrap.innerHTML = '';
-  PHASE_ORDER.forEach((key) => {
-    const meta = PHASE_META[key];
-    const b = info.bounds[key];
-    const node = document.createElement('button');
-    node.className = 'timeline-node' + (key === info.phase ? ' is-active' : '');
-    node.style.setProperty('--tn-glow', meta.colors.glow);
-    node.innerHTML = `<span class="tn-dot"></span><span class="tn-label">${meta.world}</span><span class="tn-range">Day ${b.start}–${b.end}</span>`;
-    wrap.appendChild(node);
-  });
-}
-
-function renderDashboard(info, meta) {
-  $('aiInsight').textContent = meta.insight;
-
-  const d = info.daysUntilNextPeriod;
-  let periodLine;
-  if (info.phase === 'menstrual') periodLine = `currently on day ${info.currentDay} of her period.`;
-  else if (info.phase === 'luteal' && d <= 5) periodLine = `expecting her period in about ${d} day${d === 1 ? '' : 's'} — a little extra patience helps here.`;
-  else periodLine = `expecting her next period around ${formatPretty(info.nextPeriodDate)}.`;
-  $('briefText').textContent = `In the ${meta.label} (${meta.world}) — ${meta.mantra.toLowerCase()}. She's ${periodLine}`;
-  renderCouples(info, meta);
-}
-
-function renderCouples(info, meta) {
-  const name = $('partnerName').value.trim();
-  const person = name || 'your partner';
-  const phaseAdvice = {
-    menstrual: ['Offer comfort, warmth, or practical help without pressure.', 'Rest may be the most useful plan today.', 'Ask before touching, planning, or solving.'],
-    follicular: ['Make room for plans or a little extra energy if they want it.', 'Energy can rise, but every day is still individual.', 'Support their pace instead of expecting a mood.'],
-    ovulation: ['Enjoy connection, movement, or social time if it feels welcome.', 'A predicted fertile window is not birth control.', 'Consent and contraception conversations matter every day.'],
-    luteal: ['Help protect quiet time and check whether supplies are stocked.', 'PMS varies widely and is never a personality label.', 'Offer patience, then listen to the answer you get.'],
-  }[info.phase];
-  $('couplesPhaseLabel').textContent = `${meta.label} · day ${info.currentDay}`;
-  $('couplesTitle').textContent = `${person} may need a little more of this`;
-  $('couplesSummary').textContent = `${person} is in ${meta.world}. ${meta.mantra}. This is an estimate for context, not a diagnosis or a rule for how they should feel.`;
-  $('couplesTry').textContent = phaseAdvice[0];
-  $('couplesRemember').textContent = phaseAdvice[1];
-  $('couplesRespect').textContent = phaseAdvice[2];
-}
-
-function renderMoodChips() {
-  const log = getTodayLog(currentData);
-  buildChipRow($('moodChips'), MOODS, log.mood, (val) => { log.mood = log.mood === val ? null : val; saveData(currentData); renderMoodChips(); renderBrief(); });
-}
-function renderSymptomChips() {
-  const log = getTodayLog(currentData);
-  buildMultiChipRow($('symptomChips'), SYMPTOMS, log.symptoms, (val) => {
-    const idx = log.symptoms.indexOf(val);
-    if (idx > -1) log.symptoms.splice(idx, 1); else log.symptoms.push(val);
-    saveData(currentData); renderSymptomChips();
-  });
-}
-function buildChipRow(container, options, activeVal, onClick) {
-  container.innerHTML = '';
-  options.forEach((opt) => {
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = 'chip' + (opt === activeVal ? ' is-active' : '');
-    chip.textContent = opt;
-    chip.addEventListener('click', () => onClick(opt));
-    container.appendChild(chip);
-  });
-}
-function buildMultiChipRow(container, options, activeArr, onClick) {
-  container.innerHTML = '';
-  options.forEach((opt) => {
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = 'chip' + (activeArr.includes(opt) ? ' is-active' : '');
-    chip.textContent = opt;
-    chip.addEventListener('click', () => onClick(opt));
-    container.appendChild(chip);
-  });
-}
-function renderBrief() {
-  const info = computeCycleInfo(currentData);
-  renderDashboard(info, PHASE_META[info.phase]);
-}
-
-function renderHistory(data) {
-  const history = (data.history && data.history.length ? data.history : [data.lastPeriodStart]).slice().sort((a, b) => new Date(b) - new Date(a));
-  const body = $('historyBody'); const empty = $('historyEmpty');
-  body.innerHTML = '';
-  if (!history.length) { empty.hidden = false; return; }
-  empty.hidden = true;
-  history.forEach((dstr, idx) => {
-    const tr = document.createElement('tr');
-    const tdDate = document.createElement('td'); tdDate.textContent = formatPretty(parseDateOnly(dstr));
-    const tdLen = document.createElement('td');
-    tdLen.textContent = idx < history.length - 1 ? `${Math.round((parseDateOnly(dstr) - parseDateOnly(history[idx + 1])) / DAY_MS)} days` : '—';
-    tr.appendChild(tdDate); tr.appendChild(tdLen); body.appendChild(tr);
-  });
-}
-
-function renderSettingsForm(data) {
-  $('editLastPeriod').value = data.lastPeriodStart;
-  $('editLastPeriodEnd').value = getStoredPeriodEnd(data);
-  $('editCycleLength').value = data.cycleLength;
-  $('editPeriodLength').value = data.periodLength;
-}
-
-function setupPhaseImageUploads() {
-  document.querySelectorAll('[data-phase-image]').forEach((input) => {
-    input.addEventListener('change', () => {
-      const file = input.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.addEventListener('load', () => {
-        const data = loadData();
-        if (!data) return;
-        if (!data.customImages) data.customImages = {};
-        data.customImages[input.dataset.phaseImage] = reader.result;
-        saveData(data);
-        buildWorldGallery();
-      });
-      reader.readAsDataURL(file);
-    });
-  });
-}
-
-function buildLearnAccordion() {
-  const wrap = $('learnAccordion');
-  wrap.innerHTML = '';
-  LEARN_CONTENT.forEach((item, i) => {
-    const el = document.createElement('div');
-    el.className = 'accordion-item glass-panel' + (i === 0 ? ' is-open' : '');
-    el.innerHTML = `<button class="accordion-trigger" aria-expanded="${i === 0}">
-        <span>${item.title}</span><span class="acc-plus">+</span>
-      </button>
-      <div class="accordion-panel"><div class="accordion-panel-inner">${item.body}</div></div>`;
-    el.querySelector('.accordion-trigger').addEventListener('click', () => {
-      const wasOpen = el.classList.contains('is-open');
-      el.classList.toggle('is-open');
-      el.querySelector('.accordion-trigger').setAttribute('aria-expanded', String(!wasOpen));
-    });
-    wrap.appendChild(el);
-  });
-}
-
-// ---------------- COUNTDOWN TICK ----------------
-function tick() {
-  if (!currentData) return;
-  const now = new Date();
-  const info = computeCycleInfo(currentData, now);
-
-  if (document.body.getAttribute('data-phase') !== info.phase) { renderAll(); return; }
-
-  const ms = info.nextPhaseDate - now;
-  const parts = formatCountdownParts(ms);
-  updateDigit('d', parts.d); updateDigit('h', parts.h); updateDigit('m', parts.m); updateDigit('s', parts.s);
-}
-function updateDigit(unit, value) {
-  const el = document.querySelector(`.digit[data-unit="${unit}"]`);
-  if (!el) return;
-  if (el.textContent !== value) {
-    if (!prefersReducedMotion) {
-      clearTimeout(el._rollTimer);
-      el.classList.add('is-rolling');
-      el._rollTimer = setTimeout(() => { el.textContent = value; el.classList.remove('is-rolling'); }, 140);
-    } else { el.textContent = value; }
-  }
-}
-
-// ==========================================================
-// PARTICLE FIELD (canvas)
-// ==========================================================
-function hexToRgb(hex) {
-  const m = hex.replace('#', '');
-  const bigint = parseInt(m.length === 3 ? m.split('').map(c => c + c).join('') : m, 16);
-  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
-}
-(function particleField() {
-  const canvas = $('particleField');
-  if (isTouchDevice || prefersReducedMotion) {
-    canvas.hidden = true;
-    return;
-  }
-  const ctx = canvas.getContext('2d');
-  let particles = [];
-  let w, h, dpr;
-
-  function resize() {
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
-    w = window.innerWidth; h = window.innerHeight;
-    canvas.width = w * dpr; canvas.height = h * dpr;
-    canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  }
-  function seed() {
-    const isMobile = window.innerWidth < 640;
-    const count = isMobile ? 18 : 46;
-    particles = Array.from({ length: count }, () => ({
-      x: Math.random() * w, y: Math.random() * h,
-      vx: (Math.random() - 0.5) * 0.12, vy: (Math.random() - 0.5) * 0.12,
-      r: Math.random() * 1.6 + 0.4, a: Math.random() * 0.5 + 0.15,
-    }));
-  }
-  function getGlow() {
-    const raw = getComputedStyle(document.body).getPropertyValue('--p-glow').trim() || '#8C6FE0';
-    return hexToRgb(raw);
-  }
-  function draw() {
-    ctx.clearRect(0, 0, w, h);
-    const c = getGlow();
-    particles.forEach((p) => {
-      p.x += p.vx; p.y += p.vy;
-      if (p.x < 0) p.x = w; if (p.x > w) p.x = 0;
-      if (p.y < 0) p.y = h; if (p.y > h) p.y = 0;
-      ctx.beginPath();
-      ctx.fillStyle = `rgba(${c.r},${c.g},${c.b},${p.a})`;
-      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-      ctx.fill();
-    });
-    if (!prefersReducedMotion && document.visibilityState === 'visible') requestAnimationFrame(draw);
-  }
-  window.addEventListener('resize', () => { resize(); seed(); });
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !prefersReducedMotion) requestAnimationFrame(draw); });
-  resize(); seed(); draw();
-})();
-
-// ==========================================================
-// CURSOR GLOW + TILT CARDS
-// ==========================================================
-if (isFinePointer && !prefersReducedMotion) {
-  const glow = $('cursorGlow');
-  window.addEventListener('mousemove', (e) => {
-    glow.style.opacity = '1';
-    glow.style.transform = `translate(${e.clientX}px, ${e.clientY}px) translate(-50%,-50%)`;
-  });
-  window.addEventListener('mouseleave', () => { glow.style.opacity = '0'; });
-}
-
-// ==========================================================
-// EVENT WIRING
-// ==========================================================
-document.addEventListener('DOMContentLoaded', () => {
-  buildWorldGallery();
-  buildLearnAccordion();
-  setupPhaseImageUploads();
-  document.querySelectorAll('[data-fallback]').forEach((image) => {
-    image.addEventListener('error', () => { image.hidden = true; });
-  });
-
-  const existing = loadData();
-  if (existing) showTracker(); else showOnboarding();
-
-  $('landingNavBtn').addEventListener('click', goToHomePage);
-  $('mobileHomeBtn').addEventListener('click', goToHomePage);
-  $('brandHomeLink').addEventListener('click', (event) => {
-    event.preventDefault();
-    goToHomePage();
-  });
-
-  $('startTrackingBtn').addEventListener('click', () => {
-    document.getElementById('setupSection').scrollIntoView({ behavior: 'smooth' });
-  });
-
-  $('setupForm').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const lastPeriodStart = $('lastPeriodDate').value;
-    const lastPeriodEnd = $('lastPeriodEndDate').value;
-    const cycleLength = parseInt($('cycleLength').value, 10);
-    const periodLength = parseInt($('periodLength').value, 10);
-    $('dateError').hidden = true;
-    $('endDateError').hidden = true;
-    if (!lastPeriodStart) return;
-    if (isFutureDate(lastPeriodStart)) {
-      $('dateError').hidden = false;
-      $('lastPeriodDate').focus();
-      return;
-    }
-    if (!isValidPeriodEnd(lastPeriodStart, lastPeriodEnd)) {
-      $('endDateError').hidden = false;
-      $('lastPeriodEndDate').focus();
-      return;
-    }
-    const calculatedPeriodLength = Math.round((parseDateOnly(lastPeriodEnd) - parseDateOnly(lastPeriodStart)) / DAY_MS) + 1;
-    if (calculatedPeriodLength > 10) {
-      $('endDateError').textContent = 'The period length cannot be longer than 10 days.';
-      $('endDateError').hidden = false;
-      $('lastPeriodEndDate').focus();
-      return;
-    }
-    $('periodLength').value = calculatedPeriodLength;
-    saveData({ lastPeriodStart, lastPeriodEnd, cycleLength, periodLength: calculatedPeriodLength, history: [lastPeriodStart], logs: {} });
-    showTracker();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  });
-
-  $('settingsForm').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const data = loadData() || {};
-    data.lastPeriodStart = $('editLastPeriod').value;
-    data.lastPeriodEnd = $('editLastPeriodEnd').value;
-    if (!data.lastPeriodStart || isFutureDate(data.lastPeriodStart)) {
-      $('editLastPeriod').setCustomValidity('Choose today or an earlier date.');
-      $('editLastPeriod').reportValidity();
-      return;
-    }
-    if (!isValidPeriodEnd(data.lastPeriodStart, data.lastPeriodEnd)) {
-      $('editLastPeriodEnd').setCustomValidity('Choose an end date on or after the start date and no later than today.');
-      $('editLastPeriodEnd').reportValidity();
-      return;
-    }
-    const calculatedPeriodLength = Math.round((parseDateOnly(data.lastPeriodEnd) - parseDateOnly(data.lastPeriodStart)) / DAY_MS) + 1;
-    if (calculatedPeriodLength > 10) {
-      $('editLastPeriodEnd').setCustomValidity('The period length cannot be longer than 10 days.');
-      $('editLastPeriodEnd').reportValidity();
-      return;
-    }
-    $('editLastPeriod').setCustomValidity('');
-    $('editLastPeriodEnd').setCustomValidity('');
-    data.cycleLength = parseInt($('editCycleLength').value, 10);
-    data.periodLength = calculatedPeriodLength;
-    $('editPeriodLength').value = calculatedPeriodLength;
-    if (!data.history) data.history = [data.lastPeriodStart];
-    saveData(data);
-    renderAll();
-  });
-
-  $('resetBtn').addEventListener('click', () => {
-    if (confirm('This will erase all saved cycle data on this device. Continue?')) {
-      localStorage.removeItem(STORAGE_KEY);
-      if (countdownTimer) clearInterval(countdownTimer);
-      showOnboarding();
-      window.scrollTo({ top: 0 });
-    }
-  });
-
-  function logPeriodToday() {
-    const data = loadData(); if (!data) return;
-    const todayStr = dateOnlyString(new Date());
-    if (!data.history) data.history = [];
-    if (!data.history.includes(todayStr)) data.history.unshift(todayStr);
-    data.lastPeriodStart = todayStr;
-    data.lastPeriodEnd = todayStr;
-    data.periodLength = 1;
-    saveData(data);
-    renderAll();
-  }
-  $('logTodayBtn').addEventListener('click', logPeriodToday);
-
-  $('copyBriefBtn').addEventListener('click', () => {
-    const text = $('briefText').textContent;
-    navigator.clipboard?.writeText(text).then(() => {
-      const btn = $('copyBriefBtn'); const orig = btn.textContent;
-      btn.textContent = 'Copied'; setTimeout(() => { btn.textContent = orig; }, 1500);
-    }).catch(() => {});
-  });
-
-  $('partnerName').addEventListener('input', () => {
-    if (currentData) {
-      const info = computeCycleInfo(currentData);
-      renderCouples(info, PHASE_META[info.phase]);
-    }
-  });
-  $('copyCouplesBtn').addEventListener('click', async () => {
-    const text = `${$('couplesTitle').textContent}. ${$('couplesSummary').textContent} ${$('couplesTry').textContent}`;
-    try { await navigator.clipboard.writeText(text); } catch (e) { return; }
-    const button = $('copyCouplesBtn'); const original = button.textContent; button.textContent = 'Copied'; setTimeout(() => { button.textContent = original; }, 1500);
-  });
-
-  // nav + bottom nav scroll
-  document.querySelectorAll('[data-scroll]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const target = document.getElementById(btn.getAttribute('data-scroll'));
-      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-  });
-
-  window.addEventListener('resize', () => {
-    const mobile = window.matchMedia('(max-width:640px)').matches;
-    if (currentData) $('bottomNav').hidden = !mobile;
-  });
-});
