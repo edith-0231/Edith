@@ -362,12 +362,6 @@ main, .footer, .nav{ position:relative; z-index:3; }
 .profile-section{ max-width:1280px; margin:0 auto; padding:0 clamp(16px,4vw,44px) 110px; }
 .settings-form{ padding:clamp(22px,4vw,32px); max-width:640px; }
 .settings-actions{ display:flex; gap:12px; margin-top:8px; flex-wrap:wrap; }
-.phase-image-settings{ margin:22px 0 10px; padding-top:20px; border-top:1px solid color-mix(in srgb,var(--p-text) 12%,transparent); }
-.settings-label{ font-family:var(--font-mono); font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; }
-.settings-help{ margin-top:5px; font-size:.78rem; opacity:.62; }
-.image-upload-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:14px; }
-.image-upload-field{ display:flex; flex-direction:column; gap:8px; padding:12px; border:1px solid color-mix(in srgb,var(--p-text) 15%,transparent); border-radius:var(--radius-sm); font-size:.76rem; font-weight:700; }
-.image-upload-field input{ width:100%; min-width:0; font-size:.7rem; color:var(--p-text); }
 
 /* ---------------- BOTTOM NAV (mobile) ---------------- */
 .bottom-nav{
@@ -497,7 +491,6 @@ body{ background:
   .world-card::after{ width:90px; height:90px; }
   .module-grid{ gap:10px; }
   .module{ min-height:0; }
-  .image-upload-grid{ grid-template-columns:1fr; }
 }
 
 @media (max-width:640px){
