@@ -7,6 +7,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const PHASE_ORDER = ['menstrual', 'follicular', 'ovulation', 'luteal'];
 const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const isFinePointer = window.matchMedia('(hover:hover) and (pointer:fine)').matches;
+const isTouchDevice = window.matchMedia('(hover:none), (pointer:coarse)').matches || window.innerWidth <= 640;
 
 // ---- Phase content library ----
 const PHASE_META = {
@@ -146,15 +147,6 @@ function computeCycleInfo(data, now = new Date()) {
     nextPhaseKey, nextPhaseDate, nextPeriodDate, daysUntilNextPeriod, cycleLength, periodLength, dayInPhase, phaseLength };
 }
 
-function energyForPhase(phase, dayInPhase, phaseLength) {
-  const t = phaseLength > 1 ? (dayInPhase - 1) / (phaseLength - 1) : 0;
-  const curves = {
-    menstrual: [30, 45], follicular: [50, 80], ovulation: [85, 96], luteal: [70, 25],
-  };
-  const [a, b] = curves[phase];
-  return Math.round(a + (b - a) * t);
-}
-
 // ==========================================================
 // RING RENDERING (SVG)
 // ==========================================================
@@ -212,10 +204,7 @@ function formatCountdownParts(ms) {
 // ==========================================================
 let currentData = null;
 let countdownTimer = null;
-let previewKey = null; // when set, dashboard displays this phase instead of the real one
 const $ = (id) => document.getElementById(id);
-
-function effectivePhase(info) { return previewKey || info.phase; }
 
 function setBodyPhase(phaseKey) {
   document.body.setAttribute('data-phase', phaseKey);
@@ -276,28 +265,17 @@ function renderAll() {
   currentData = loadData();
   if (!currentData) { showOnboarding(); return; }
   const info = computeCycleInfo(currentData);
-  const phaseKey = effectivePhase(info);
-  const meta = PHASE_META[phaseKey];
-  setBodyPhase(phaseKey);
+  const meta = PHASE_META[info.phase];
+  setBodyPhase(info.phase);
 
-  // preview banner
-  const isPreview = !!previewKey && previewKey !== info.phase;
-  $('previewBanner').hidden = !isPreview;
-  if (isPreview) $('previewPhaseName').textContent = meta.world;
-
-  // ring + glass center — always shows REAL day/phase (source of truth), even in preview
-  const bounds = { ...info.bounds, __current: phaseKey };
+  const bounds = { ...info.bounds, __current: info.phase };
   renderRing($('cycleRingSvg'), bounds, info.cycleLength, info.currentDay, meta.colors);
   $('ringDay').textContent = `Day ${info.currentDay}`;
-  $('ringPhase').textContent = isPreview ? meta.label + ' (preview)' : meta.label;
+  $('ringPhase').textContent = meta.label;
   $('ringMantra').textContent = meta.mantra;
 
-  // countdown wording + progress use the effective (preview or real) phase context
   $('countdownEyebrow').textContent = `Estimated time to ${meta.nextLabel}`;
-  const progressPct = Math.round((info.currentDay / info.cycleLength) * 100);
-  $('progressSub').textContent = `Day ${info.currentDay} of ${info.cycleLength}`;
   $('nextPeriodInline').textContent = formatPretty(info.nextPeriodDate);
-  setProgressRing(progressPct);
 
   fillList('listDo', meta.do);
   fillList('listAvoid', meta.avoid);
@@ -322,15 +300,6 @@ function renderAll() {
   tick(); // set initial countdown numbers immediately
 }
 
-function setProgressRing(pct) {
-  const r = 34, C = 2 * Math.PI * r;
-  const fill = $('progressRingFill');
-  fill.setAttribute('stroke-dasharray', `${C}`);
-  fill.setAttribute('stroke-dashoffset', `${C - (pct / 100) * C}`);
-  $('progressRingValue').textContent = `${pct}%`;
-  $('dashProgress').textContent = `${pct}%`;
-}
-
 function fillList(id, items) {
   const el = $(id); el.innerHTML = '';
   items.forEach((t) => { const li = document.createElement('li'); li.textContent = t; el.appendChild(li); });
@@ -346,18 +315,11 @@ function renderTimeline(info) {
     node.className = 'timeline-node' + (key === info.phase ? ' is-active' : '');
     node.style.setProperty('--tn-glow', meta.colors.glow);
     node.innerHTML = `<span class="tn-dot"></span><span class="tn-label">${meta.world}</span><span class="tn-range">Day ${b.start}–${b.end}</span>`;
-    node.addEventListener('click', () => {
-      previewKey = key === info.phase ? null : key;
-      renderAll();
-    });
     wrap.appendChild(node);
   });
 }
 
 function renderDashboard(info, meta) {
-  const energy = energyForPhase(info.phase, info.dayInPhase, info.phaseLength);
-  $('energyBar').style.width = energy + '%';
-  $('energyValue').textContent = energy + '%';
   $('aiInsight').textContent = meta.insight;
 
   const d = info.daysUntilNextPeriod;
@@ -422,7 +384,7 @@ function buildMultiChipRow(container, options, activeArr, onClick) {
 }
 function renderBrief() {
   const info = computeCycleInfo(currentData);
-  renderDashboard(info, PHASE_META[effectivePhase(info)]);
+  renderDashboard(info, PHASE_META[info.phase]);
 }
 
 function renderHistory(data) {
@@ -471,10 +433,9 @@ function tick() {
   const now = new Date();
   const info = computeCycleInfo(currentData, now);
 
-  if (!previewKey && document.body.getAttribute('data-phase') !== info.phase) { renderAll(); return; }
+  if (document.body.getAttribute('data-phase') !== info.phase) { renderAll(); return; }
 
-  const targetDate = previewKey ? null : info.nextPhaseDate;
-  const ms = targetDate ? (targetDate - now) : (info.nextPhaseDate - now);
+  const ms = info.nextPhaseDate - now;
   const parts = formatCountdownParts(ms);
   updateDigit('d', parts.d); updateDigit('h', parts.h); updateDigit('m', parts.m); updateDigit('s', parts.s);
 }
@@ -500,6 +461,10 @@ function hexToRgb(hex) {
 }
 (function particleField() {
   const canvas = $('particleField');
+  if (isTouchDevice || prefersReducedMotion) {
+    canvas.hidden = true;
+    return;
+  }
   const ctx = canvas.getContext('2d');
   let particles = [];
   let w, h, dpr;
@@ -513,7 +478,7 @@ function hexToRgb(hex) {
   }
   function seed() {
     const isMobile = window.innerWidth < 640;
-    const count = prefersReducedMotion ? 0 : (isMobile ? 18 : 46);
+    const count = isMobile ? 18 : 46;
     particles = Array.from({ length: count }, () => ({
       x: Math.random() * w, y: Math.random() * h,
       vx: (Math.random() - 0.5) * 0.12, vy: (Math.random() - 0.5) * 0.12,
@@ -600,7 +565,6 @@ document.addEventListener('DOMContentLoaded', () => {
     data.periodLength = parseInt($('editPeriodLength').value, 10);
     if (!data.history) data.history = [data.lastPeriodStart];
     saveData(data);
-    previewKey = null;
     renderAll();
   });
 
@@ -608,7 +572,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (confirm('This will erase all saved cycle data on this device. Continue?')) {
       localStorage.removeItem(STORAGE_KEY);
       if (countdownTimer) clearInterval(countdownTimer);
-      previewKey = null;
       showOnboarding();
       window.scrollTo({ top: 0 });
     }
@@ -621,12 +584,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!data.history.includes(todayStr)) data.history.unshift(todayStr);
     data.lastPeriodStart = todayStr;
     saveData(data);
-    previewKey = null;
     renderAll();
   }
   $('logTodayBtn').addEventListener('click', logPeriodToday);
-
-  $('exitPreviewBtn').addEventListener('click', () => { previewKey = null; renderAll(); });
 
   $('copyBriefBtn').addEventListener('click', () => {
     const text = $('briefText').textContent;
